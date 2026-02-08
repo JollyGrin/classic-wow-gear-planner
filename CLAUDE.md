@@ -51,9 +51,9 @@ Always use normalized slots in UI:
 ## Testing Commands
 
 ```bash
-bun test           # Run Vitest unit tests
-bun test:e2e       # Run Playwright E2E tests
-bun test:all       # Run both
+bun run test       # Run Vitest unit tests
+bun run test:e2e   # Run Playwright E2E tests
+bun run test:all   # Run both
 ```
 
 ## Don't
@@ -74,37 +74,37 @@ bun test:all       # Run both
 - [x] CLAUDE.md, LEARNINGS.md, SKILLS.md
 - [x] Vitest + Playwright setup
 
-### Phase 1: Data Layer
+### Phase 1: Data Layer ✓
 
-- [ ] Item TypeScript interface
-- [ ] Slot normalization utility
-- [ ] Items service
-- [ ] Unit tests
+- [x] Item TypeScript interface
+- [x] Slot normalization utility
+- [x] Items service
+- [x] Unit tests
 
-### Phase 2: Items Tab
+### Phase 2: Items Tab ✓
 
-- [ ] Search, filter, sort
-- [ ] Item list with infinite scroll
-- [ ] Add to list button
-- [ ] E2E tests
+- [x] Search, filter, sort
+- [x] Item list with infinite scroll
+- [x] Add to list button
+- [x] E2E tests
 
-### Phase 3: Progression Tab
+### Phase 3: Progression Tab ✓
 
-- [ ] Timeline component
-- [ ] Item positioning
-- [ ] Stacking logic
-- [ ] E2E tests
+- [x] Timeline component
+- [x] Item positioning
+- [x] Stacking logic
+- [x] E2E tests
 
-### Phase 4: Persistence
+### Phase 4: Persistence ✓
 
-- [ ] Dexie schema
-- [ ] CRUD operations
-- [ ] URL sharing
-- [ ] E2E tests
+- [x] Dexie schema
+- [x] CRUD operations
+- [x] URL sharing
+- [x] E2E tests
 
-### Phase 5: Polish
+### Phase 5: Polish ✓
 
-- [ ] Responsive design
-- [ ] Keyboard shortcuts
-- [ ] Loading/error states
-- [ ] Accessibility
+- [x] Responsive design
+- [x] Keyboard shortcuts
+- [x] Loading/error states
+- [x] Accessibility
