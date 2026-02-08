@@ -63,6 +63,7 @@ bun test:all       # Run both
 - Ignore LEARNINGS.md entries
 - Add features not in current phase scope
 - Over-engineer solutions
+- NEVER open items.json, as it's 10mb. You MUST use jq to query exactly what you need, limit results, and avoid crashing your context window.
 
 ## Phase Checklist
 
