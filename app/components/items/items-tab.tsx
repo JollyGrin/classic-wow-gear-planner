@@ -1,18 +1,23 @@
 'use client'
 
 import { useCallback, useMemo, useRef, useState } from 'react'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  type VisibilityState,
+  type ColumnPinningState,
+  type SortingState,
+} from '@tanstack/react-table'
 import { useItems } from '@/app/hooks/use-items'
 import { useDebounce } from '@/app/hooks/use-debounce'
 import { useKeyboardShortcut } from '@/app/hooks/use-keyboard-shortcut'
 import { ItemFiltersComponent } from './item-filters'
-import { ItemList } from './item-list'
+import { DataTable } from './data-table'
+import { ColumnVisibilityToggle } from './column-visibility-toggle'
+import { columns } from './columns'
 import { normalizeSlot } from '@/app/lib/slots'
-import type { Item, ItemFilters, StatKey } from '@/app/lib/types'
-
-type SortKey = 'name' | 'requiredLevel' | 'itemLevel' | 'quality'
-type SortDirection = 'asc' | 'desc'
-
-const QUALITY_ORDER = ['Uncommon', 'Rare', 'Epic', 'Legendary', 'Heirloom'] as const
+import type { Item, ItemFilters } from '@/app/lib/types'
 
 interface ItemsTabProps {
   onAddItem?: (item: Item) => void
@@ -23,14 +28,28 @@ export function ItemsTab({ onAddItem, hasItem }: ItemsTabProps) {
   const { data: items = [], isLoading, error } = useItems()
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<ItemFilters>({})
-  const [sortKey, setSortKey] = useState<SortKey>('name')
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
-  const [sortStat, setSortStat] = useState<StatKey | null>(null)
+  const [sorting, setSorting] = useState<SortingState>([])
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
+    armor: false,
+    stamina: false,
+    strength: false,
+    agility: false,
+    intellect: false,
+    spirit: false,
+    fireResist: false,
+    frostResist: false,
+    natureResist: false,
+    shadowResist: false,
+    arcaneResist: false,
+  })
+  const [columnPinning] = useState<ColumnPinningState>({
+    left: ['item'],
+    right: ['actions'],
+  })
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   const debouncedSearch = useDebounce(search, 200)
 
-  // Keyboard shortcut: "/" to focus search
   useKeyboardShortcut(
     '/',
     useCallback(() => {
@@ -38,37 +57,30 @@ export function ItemsTab({ onAddItem, hasItem }: ItemsTabProps) {
     }, [])
   )
 
-  const filteredAndSortedItems = useMemo(() => {
+  const preFilteredItems = useMemo(() => {
     let result = items
 
-    // Search filter
     if (debouncedSearch) {
       const lowerSearch = debouncedSearch.toLowerCase()
       result = result.filter((item) => item.name.toLowerCase().includes(lowerSearch))
     }
 
-    // Slot filter (handle normalized slots)
     if (filters.slot) {
       result = result.filter((item) => {
-        // Check raw slot
         if (item.slot === filters.slot) return true
-        // Check normalized slot
         const normalized = normalizeSlot(item.slot)
         return normalized === filters.slot
       })
     }
 
-    // Class filter
     if (filters.class) {
       result = result.filter((item) => item.class === filters.class)
     }
 
-    // Quality filter
     if (filters.quality) {
       result = result.filter((item) => item.quality === filters.quality)
     }
 
-    // Level filters
     if (filters.minLevel !== undefined) {
       result = result.filter((item) => item.requiredLevel >= filters.minLevel!)
     }
@@ -76,59 +88,29 @@ export function ItemsTab({ onAddItem, hasItem }: ItemsTabProps) {
       result = result.filter((item) => item.requiredLevel <= filters.maxLevel!)
     }
 
-    // Sort
-    result = [...result].sort((a, b) => {
-      // If sorting by stat, handle that first
-      if (sortStat) {
-        const aVal = a.stats[sortStat] ?? 0
-        const bVal = b.stats[sortStat] ?? 0
-        // Items without the stat go to bottom
-        if (aVal === 0 && bVal === 0) {
-          // Both have no stat, fall through to secondary sort by name
-          return a.name.localeCompare(b.name)
-        }
-        if (aVal === 0) return 1
-        if (bVal === 0) return -1
-        // Stat sorting is descending by default (highest first)
-        return bVal - aVal
-      }
-
-      // Standard sorting
-      let cmp = 0
-      switch (sortKey) {
-        case 'name':
-          cmp = a.name.localeCompare(b.name)
-          break
-        case 'requiredLevel':
-          cmp = a.requiredLevel - b.requiredLevel
-          break
-        case 'itemLevel':
-          cmp = a.itemLevel - b.itemLevel
-          break
-        case 'quality':
-          cmp = QUALITY_ORDER.indexOf(a.quality) - QUALITY_ORDER.indexOf(b.quality)
-          break
-      }
-      return sortDirection === 'asc' ? cmp : -cmp
-    })
-
     return result
-  }, [items, debouncedSearch, filters, sortKey, sortDirection, sortStat])
+  }, [items, debouncedSearch, filters])
 
-  const toggleSort = (key: SortKey) => {
-    // Clear stat sort when using standard sort
-    setSortStat(null)
-    if (sortKey === key) {
-      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortKey(key)
-      setSortDirection('asc')
-    }
-  }
-
-  const handleSortStatChange = (stat: StatKey | null) => {
-    setSortStat(stat)
-  }
+  const table = useReactTable({
+    data: preFilteredItems,
+    columns,
+    state: {
+      sorting,
+      columnVisibility,
+      columnPinning,
+    },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    enableMultiSort: true,
+    maxMultiSortColCount: 3,
+    isMultiSortEvent: (e: unknown) => (e as MouseEvent).shiftKey,
+    meta: {
+      onAddItem,
+      hasItem,
+    },
+  })
 
   if (isLoading) {
     return (
@@ -147,35 +129,23 @@ export function ItemsTab({ onAddItem, hasItem }: ItemsTabProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <ItemFiltersComponent
         search={search}
         onSearchChange={setSearch}
         filters={filters}
         onFiltersChange={setFilters}
         searchInputRef={searchInputRef}
-        itemCount={filteredAndSortedItems.length}
-        sortStat={sortStat}
-        onSortStatChange={handleSortStatChange}
       />
 
-      <div className="flex items-center justify-end text-sm text-muted-foreground">
-        <div className="flex gap-2">
-          <span>Sort:</span>
-          {(['name', 'requiredLevel', 'itemLevel', 'quality'] as const).map((key) => (
-            <button
-              key={key}
-              onClick={() => toggleSort(key)}
-              className={`hover:text-foreground ${sortKey === key && !sortStat ? 'text-foreground font-medium' : ''}`}
-            >
-              {key === 'requiredLevel' ? 'Lvl' : key === 'itemLevel' ? 'iLvl' : key}
-              {sortKey === key && !sortStat && (sortDirection === 'asc' ? ' ↑' : ' ↓')}
-            </button>
-          ))}
-        </div>
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-muted-foreground">
+          {preFilteredItems.length} items
+        </span>
+        <ColumnVisibilityToggle table={table} />
       </div>
 
-      <ItemList items={filteredAndSortedItems} onAddItem={onAddItem} hasItem={hasItem} />
+      <DataTable table={table} />
     </div>
   )
 }

@@ -56,25 +56,59 @@ test('can switch between tabs', async ({ page }) => {
   await expect(page.getByPlaceholder('Search items...')).toBeVisible()
 })
 
-test('infinite scroll loads more items', async ({ page }) => {
+test('virtual scroll renders rows', async ({ page }) => {
   await page.goto('/')
 
-  // Wait for initial items to load
-  await expect(page.getByText(/Loading more/)).toBeVisible({ timeout: 10000 })
+  // Wait for table to load with rows
+  await expect(page.getByTestId('table-row').first()).toBeVisible({ timeout: 10000 })
 
-  // Scroll down
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+  // Should have multiple rows visible
+  const rowCount = await page.getByTestId('table-row').count()
+  expect(rowCount).toBeGreaterThan(5)
+})
 
-  // Wait for more items to load
-  await page.waitForTimeout(500)
+test('can sort by clicking column header', async ({ page }) => {
+  await page.goto('/')
 
-  // Count should have increased
-  const loadingText = page.getByText(/Loading more/)
-  if (await loadingText.isVisible()) {
-    const text = await loadingText.textContent()
-    const match = text?.match(/(\d+) of (\d+)/)
-    if (match) {
-      expect(parseInt(match[1])).toBeGreaterThan(50)
-    }
-  }
+  // Wait for table to render
+  await expect(page.getByTestId('table-row').first()).toBeVisible({ timeout: 10000 })
+
+  // Click iLvl header to sort
+  await page.getByText('iLvl').click()
+
+  // Should show sort indicator
+  await expect(page.locator('svg.lucide-arrow-up, svg.lucide-arrow-down').first()).toBeVisible()
+})
+
+test('can toggle stat column visibility', async ({ page }) => {
+  await page.goto('/')
+
+  // Wait for table to render
+  await expect(page.getByTestId('table-row').first()).toBeVisible({ timeout: 10000 })
+
+  // Open columns dropdown
+  await page.getByRole('button', { name: 'Toggle columns' }).click()
+
+  // Toggle Stamina on
+  await page.getByLabel('Stamina').check()
+
+  // STA header should now be visible in the table
+  await expect(page.getByText('STA', { exact: true })).toBeVisible()
+})
+
+test('shift-click for multi-sort', async ({ page }) => {
+  await page.goto('/')
+
+  // Wait for table to render
+  await expect(page.getByTestId('table-row').first()).toBeVisible({ timeout: 10000 })
+
+  // Click iLvl to sort first
+  await page.getByText('iLvl').click()
+
+  // Shift+click Req Lvl for multi-sort
+  await page.getByText('Req Lvl').click({ modifiers: ['Shift'] })
+
+  // Both columns should have sort indicators
+  const sortIndicators = page.locator('svg.lucide-arrow-up, svg.lucide-arrow-down')
+  await expect(sortIndicators).toHaveCount(2)
 })

@@ -4,7 +4,7 @@ import type { RefObject } from 'react'
 import { Input } from '@/app/components/ui/input'
 import { Select } from '@/app/components/ui/select'
 import { EQUIPMENT_SLOTS } from '@/app/lib/slots'
-import { ITEM_CLASSES, ITEM_QUALITIES, STAT_KEYS, STAT_LABELS, type ItemFilters, type StatKey } from '@/app/lib/types'
+import { ITEM_CLASSES, ITEM_QUALITIES, type ItemFilters } from '@/app/lib/types'
 
 interface ItemFiltersProps {
   search: string
@@ -12,9 +12,6 @@ interface ItemFiltersProps {
   filters: ItemFilters
   onFiltersChange: (filters: ItemFilters) => void
   searchInputRef?: RefObject<HTMLInputElement | null>
-  itemCount: number
-  sortStat: StatKey | null
-  onSortStatChange: (stat: StatKey | null) => void
 }
 
 export function ItemFiltersComponent({
@@ -23,9 +20,6 @@ export function ItemFiltersComponent({
   filters,
   onFiltersChange,
   searchInputRef,
-  itemCount,
-  sortStat,
-  onSortStatChange,
 }: ItemFiltersProps) {
   const updateFilter = <K extends keyof ItemFilters>(key: K, value: ItemFilters[K] | undefined) => {
     onFiltersChange({ ...filters, [key]: value || undefined })
@@ -104,25 +98,6 @@ export function ItemFiltersComponent({
             </option>
           ))}
         </Select>
-      </div>
-
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>{itemCount} items</span>
-        <div className="flex items-center gap-2">
-          <span>Stat:</span>
-          <Select
-            value={sortStat ?? ''}
-            onChange={(e) => onSortStatChange((e.target.value || null) as StatKey | null)}
-            className="w-auto min-w-[100px]"
-          >
-            <option value="">None</option>
-            {STAT_KEYS.map((stat) => (
-              <option key={stat} value={stat}>
-                {STAT_LABELS[stat]}
-              </option>
-            ))}
-          </Select>
-        </div>
       </div>
     </div>
   )
