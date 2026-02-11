@@ -7,7 +7,7 @@ import { useKeyboardShortcut } from '@/app/hooks/use-keyboard-shortcut'
 import { ItemFiltersComponent } from './item-filters'
 import { ItemList } from './item-list'
 import { normalizeSlot } from '@/app/lib/slots'
-import type { Item, ItemFilters } from '@/app/lib/types'
+import type { Item, ItemFilters, StatKey } from '@/app/lib/types'
 
 type SortKey = 'name' | 'requiredLevel' | 'itemLevel' | 'quality'
 type SortDirection = 'asc' | 'desc'
@@ -25,6 +25,7 @@ export function ItemsTab({ onAddItem, hasItem }: ItemsTabProps) {
   const [filters, setFilters] = useState<ItemFilters>({})
   const [sortKey, setSortKey] = useState<SortKey>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const [sortStat, setSortStat] = useState<StatKey | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   const debouncedSearch = useDebounce(search, 200)
@@ -67,11 +68,6 @@ export function ItemsTab({ onAddItem, hasItem }: ItemsTabProps) {
       result = result.filter((item) => item.quality === filters.quality)
     }
 
-    // Phase filter
-    if (filters.phase !== undefined) {
-      result = result.filter((item) => item.contentPhase === filters.phase)
-    }
-
     // Level filters
     if (filters.minLevel !== undefined) {
       result = result.filter((item) => item.requiredLevel >= filters.minLevel!)
@@ -82,6 +78,22 @@ export function ItemsTab({ onAddItem, hasItem }: ItemsTabProps) {
 
     // Sort
     result = [...result].sort((a, b) => {
+      // If sorting by stat, handle that first
+      if (sortStat) {
+        const aVal = a.stats[sortStat] ?? 0
+        const bVal = b.stats[sortStat] ?? 0
+        // Items without the stat go to bottom
+        if (aVal === 0 && bVal === 0) {
+          // Both have no stat, fall through to secondary sort by name
+          return a.name.localeCompare(b.name)
+        }
+        if (aVal === 0) return 1
+        if (bVal === 0) return -1
+        // Stat sorting is descending by default (highest first)
+        return bVal - aVal
+      }
+
+      // Standard sorting
       let cmp = 0
       switch (sortKey) {
         case 'name':
@@ -101,15 +113,21 @@ export function ItemsTab({ onAddItem, hasItem }: ItemsTabProps) {
     })
 
     return result
-  }, [items, debouncedSearch, filters, sortKey, sortDirection])
+  }, [items, debouncedSearch, filters, sortKey, sortDirection, sortStat])
 
   const toggleSort = (key: SortKey) => {
+    // Clear stat sort when using standard sort
+    setSortStat(null)
     if (sortKey === key) {
       setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
     } else {
       setSortKey(key)
       setSortDirection('asc')
     }
+  }
+
+  const handleSortStatChange = (stat: StatKey | null) => {
+    setSortStat(stat)
   }
 
   if (isLoading) {
@@ -136,20 +154,22 @@ export function ItemsTab({ onAddItem, hasItem }: ItemsTabProps) {
         filters={filters}
         onFiltersChange={setFilters}
         searchInputRef={searchInputRef}
+        itemCount={filteredAndSortedItems.length}
+        sortStat={sortStat}
+        onSortStatChange={handleSortStatChange}
       />
 
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>{filteredAndSortedItems.length} items</span>
+      <div className="flex items-center justify-end text-sm text-muted-foreground">
         <div className="flex gap-2">
           <span>Sort:</span>
           {(['name', 'requiredLevel', 'itemLevel', 'quality'] as const).map((key) => (
             <button
               key={key}
               onClick={() => toggleSort(key)}
-              className={`hover:text-foreground ${sortKey === key ? 'text-foreground font-medium' : ''}`}
+              className={`hover:text-foreground ${sortKey === key && !sortStat ? 'text-foreground font-medium' : ''}`}
             >
               {key === 'requiredLevel' ? 'Lvl' : key === 'itemLevel' ? 'iLvl' : key}
-              {sortKey === key && (sortDirection === 'asc' ? ' ↑' : ' ↓')}
+              {sortKey === key && !sortStat && (sortDirection === 'asc' ? ' ↑' : ' ↓')}
             </button>
           ))}
         </div>

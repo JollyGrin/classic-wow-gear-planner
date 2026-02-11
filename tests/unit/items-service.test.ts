@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { ItemsService } from '@/app/lib/items-service'
+import { ItemsService, parseStatsFromTooltip } from '@/app/lib/items-service'
 import type { Item } from '@/app/lib/types'
 
 const mockItems: Item[] = [
@@ -19,6 +19,7 @@ const mockItems: Item[] = [
     contentPhase: 1,
     source: { category: 'Boss Drop', dropChance: 0.15 },
     uniqueName: 'sword-of-testing',
+    stats: { stamina: 10 },
   },
   {
     itemId: 2,
@@ -36,6 +37,7 @@ const mockItems: Item[] = [
     contentPhase: 2,
     source: { category: 'Boss Drop', dropChance: 0.05 },
     uniqueName: 'epic-staff-of-power',
+    stats: { intellect: 30 },
   },
   {
     itemId: 3,
@@ -53,6 +55,7 @@ const mockItems: Item[] = [
     contentPhase: 1,
     source: { category: 'Quest' },
     uniqueName: 'helmet-of-valor',
+    stats: { armor: 200, strength: 15 },
   },
   {
     itemId: 4,
@@ -70,6 +73,7 @@ const mockItems: Item[] = [
     contentPhase: 1,
     source: { category: 'Vendor' },
     uniqueName: 'cloth-robe',
+    stats: { armor: 50 },
   },
 ]
 
@@ -160,10 +164,9 @@ describe('ItemsService', () => {
       expect(results).toHaveLength(2) // items with requiredLevel <= 52
     })
 
-    it('filters by phase', () => {
-      const results = service.filterItems({ phase: 2 })
-      expect(results).toHaveLength(1)
-      expect(results[0].name).toBe('Epic Staff of Power')
+    it('filters by level range', () => {
+      const results = service.filterItems({ minLevel: 50, maxLevel: 56 })
+      expect(results).toHaveLength(2) // items 1 (55) and 3 (52)
     })
 
     it('filters by source category', () => {
@@ -193,5 +196,95 @@ describe('ItemsService', () => {
       const instance2 = ItemsService.getInstance()
       expect(instance1).toBe(instance2)
     })
+  })
+})
+
+describe('parseStatsFromTooltip', () => {
+  it('parses armor', () => {
+    const tooltip = [{ label: '62 Armor' }]
+    expect(parseStatsFromTooltip(tooltip)).toEqual({ armor: 62 })
+  })
+
+  it('parses primary stats', () => {
+    const tooltip = [
+      { label: '+8 Strength' },
+      { label: '+7 Stamina' },
+      { label: '+10 Agility' },
+    ]
+    expect(parseStatsFromTooltip(tooltip)).toEqual({
+      strength: 8,
+      stamina: 7,
+      agility: 10,
+    })
+  })
+
+  it('parses intellect and spirit', () => {
+    const tooltip = [
+      { label: '+15 Intellect' },
+      { label: '+12 Spirit' },
+    ]
+    expect(parseStatsFromTooltip(tooltip)).toEqual({
+      intellect: 15,
+      spirit: 12,
+    })
+  })
+
+  it('parses resistances', () => {
+    const tooltip = [
+      { label: '+10 Fire Resistance' },
+      { label: '+15 Nature Resistance' },
+    ]
+    expect(parseStatsFromTooltip(tooltip)).toEqual({
+      fireResist: 10,
+      natureResist: 15,
+    })
+  })
+
+  it('parses all resistance types', () => {
+    const tooltip = [
+      { label: '+5 Fire Resistance' },
+      { label: '+6 Frost Resistance' },
+      { label: '+7 Nature Resistance' },
+      { label: '+8 Shadow Resistance' },
+      { label: '+9 Arcane Resistance' },
+    ]
+    expect(parseStatsFromTooltip(tooltip)).toEqual({
+      fireResist: 5,
+      frostResist: 6,
+      natureResist: 7,
+      shadowResist: 8,
+      arcaneResist: 9,
+    })
+  })
+
+  it('parses combined armor and stats', () => {
+    const tooltip = [
+      { label: '100 Armor' },
+      { label: '+20 Stamina' },
+      { label: '+15 Strength' },
+    ]
+    expect(parseStatsFromTooltip(tooltip)).toEqual({
+      armor: 100,
+      stamina: 20,
+      strength: 15,
+    })
+  })
+
+  it('returns empty object for tooltip without stats', () => {
+    const tooltip = [
+      { label: 'Some Item Name' },
+      { label: 'Binds when equipped' },
+      { label: 'Durability 100 / 100' },
+    ]
+    expect(parseStatsFromTooltip(tooltip)).toEqual({})
+  })
+
+  it('ignores non-stat lines', () => {
+    const tooltip = [
+      { label: 'Item Name' },
+      { label: '+10 Stamina' },
+      { label: 'Chance on hit: Does something', format: 'Uncommon' as const },
+    ]
+    expect(parseStatsFromTooltip(tooltip)).toEqual({ stamina: 10 })
   })
 })

@@ -1,4 +1,40 @@
-import type { Item, ItemFilters } from './types'
+import type { Item, ItemFilters, ItemStats, TooltipLine } from './types'
+
+export function parseStatsFromTooltip(tooltip: TooltipLine[]): ItemStats {
+  const stats: ItemStats = {}
+
+  for (const line of tooltip) {
+    const label = line.label
+
+    // Parse armor: "62 Armor"
+    const armorMatch = label.match(/^(\d+) Armor$/)
+    if (armorMatch) {
+      stats.armor = parseInt(armorMatch[1])
+      continue
+    }
+
+    // Parse primary stats: "+8 Strength", "+7 Stamina", etc.
+    const statMatch = label.match(/^\+(\d+) (Stamina|Agility|Strength|Intellect|Spirit)$/)
+    if (statMatch) {
+      const value = parseInt(statMatch[1])
+      const stat = statMatch[2].toLowerCase() as keyof ItemStats
+      stats[stat] = value
+      continue
+    }
+
+    // Parse resistances: "+15 Fire Resistance", "+10 Nature Resistance", etc.
+    const resistMatch = label.match(/^\+(\d+) (Fire|Frost|Nature|Shadow|Arcane) Resistance$/)
+    if (resistMatch) {
+      const value = parseInt(resistMatch[1])
+      const element = resistMatch[2].toLowerCase()
+      const key = `${element}Resist` as keyof ItemStats
+      stats[key] = value
+      continue
+    }
+  }
+
+  return stats
+}
 
 export class ItemsService {
   private static instance: ItemsService | null = null
@@ -26,7 +62,12 @@ export class ItemsService {
     if (!response.ok) {
       throw new Error(`Failed to load items: ${response.status}`)
     }
-    this.items = await response.json()
+    const rawItems = await response.json()
+    // Parse stats from tooltip for each item
+    this.items = rawItems.map((item: Omit<Item, 'stats'> & { tooltip: TooltipLine[] }) => ({
+      ...item,
+      stats: parseStatsFromTooltip(item.tooltip),
+    }))
     this.loaded = true
   }
 
@@ -67,9 +108,6 @@ export class ItemsService {
         return false
       }
       if (filters.maxLevel !== undefined && item.requiredLevel > filters.maxLevel) {
-        return false
-      }
-      if (filters.phase !== undefined && item.contentPhase !== filters.phase) {
         return false
       }
       if (filters.sourceCategory) {

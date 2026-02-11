@@ -31,6 +31,49 @@ export interface ItemSource {
   dropChance?: number
 }
 
+export interface ItemStats {
+  armor?: number
+  stamina?: number
+  agility?: number
+  strength?: number
+  intellect?: number
+  spirit?: number
+  fireResist?: number
+  frostResist?: number
+  natureResist?: number
+  shadowResist?: number
+  arcaneResist?: number
+}
+
+export const STAT_KEYS = [
+  'armor',
+  'stamina',
+  'agility',
+  'strength',
+  'intellect',
+  'spirit',
+  'fireResist',
+  'frostResist',
+  'natureResist',
+  'shadowResist',
+  'arcaneResist',
+] as const
+export type StatKey = (typeof STAT_KEYS)[number]
+
+export const STAT_LABELS: Record<StatKey, string> = {
+  armor: 'Armor',
+  stamina: 'Stamina',
+  agility: 'Agility',
+  strength: 'Strength',
+  intellect: 'Intellect',
+  spirit: 'Spirit',
+  fireResist: 'Fire Resist',
+  frostResist: 'Frost Resist',
+  natureResist: 'Nature Resist',
+  shadowResist: 'Shadow Resist',
+  arcaneResist: 'Arcane Resist',
+}
+
 export interface Item {
   itemId: number
   name: string
@@ -47,6 +90,7 @@ export interface Item {
   contentPhase: number
   source: ItemSource | null
   uniqueName: string
+  stats: ItemStats
 }
 
 export interface ItemFilters {
@@ -55,6 +99,5 @@ export interface ItemFilters {
   quality?: ItemQuality
   minLevel?: number
   maxLevel?: number
-  phase?: number
   sourceCategory?: SourceCategory
 }

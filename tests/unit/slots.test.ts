@@ -23,6 +23,7 @@ const makeItem = (slot: string, subclass?: string): Item => ({
   contentPhase: 1,
   source: null,
   uniqueName: 'test-item',
+  stats: {},
 })
 
 describe('EQUIPMENT_SLOTS', () => {
