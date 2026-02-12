@@ -1,7 +1,31 @@
 'use client'
 
+import { useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import { PaperdollLayout } from './paperdoll-layout'
+import { VIEWER_SLOT_MAP } from '@/app/lib/viewer-constants'
 import type { Item } from '@/app/lib/types'
+
+const ModelViewer = dynamic(
+  () => import('./model-viewer').then((m) => ({ default: m.ModelViewer })),
+  { ssr: false }
+)
+
+// Test display IDs extracted from item_template.sql
+const TEST_DISPLAY_IDS: Record<string, number> = {
+  Head: 22920,
+  Shoulder: 33004,
+  Back: 23421,
+  Chest: 25748,
+  Wrist: 28820,
+  Hands: 25750,
+  Waist: 28386,
+  Legs: 25343,
+  Feet: 33009,
+  'Main Hand': 29706,
+  'Off Hand': 29701,
+  Ranged: 29162,
+}
 
 // Test data — real items from the database for visual development
 const TEST_ITEMS: Record<string, Item> = {
@@ -296,9 +320,22 @@ const TEST_ITEMS: Record<string, Item> = {
 }
 
 export function CharacterTab() {
+  const viewerItems = useMemo<[number, number][]>(
+    () =>
+      Object.entries(TEST_DISPLAY_IDS)
+        .filter(([slot]) => slot in VIEWER_SLOT_MAP)
+        .map(([slot, displayId]) => [VIEWER_SLOT_MAP[slot], displayId]),
+    []
+  )
+
   return (
     <div className="flex flex-col items-center gap-6">
-      <PaperdollLayout equippedItems={TEST_ITEMS} />
+      <PaperdollLayout
+        equippedItems={TEST_ITEMS}
+        modelSlot={
+          <ModelViewer race={1} gender={0} items={viewerItems} />
+        }
+      />
     </div>
   )
 }

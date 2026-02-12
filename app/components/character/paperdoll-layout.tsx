@@ -8,6 +8,7 @@ type SlotKey = EquipmentSlot | 'Finger 2' | 'Trinket 2'
 
 interface PaperdollLayoutProps {
   equippedItems: Partial<Record<SlotKey, Item>>
+  modelSlot?: React.ReactNode
 }
 
 const LEFT_SLOTS: { slot: SlotKey; label: string }[] = [
@@ -36,7 +37,7 @@ const BOTTOM_SLOTS: { slot: SlotKey; label: string }[] = [
   { slot: 'Ranged', label: 'Ranged' },
 ]
 
-export function PaperdollLayout({ equippedItems }: PaperdollLayoutProps) {
+export function PaperdollLayout({ equippedItems, modelSlot }: PaperdollLayoutProps) {
   return (
     <div className="flex flex-col items-center gap-3">
       {/* Main 3-column layout */}
@@ -53,10 +54,12 @@ export function PaperdollLayout({ equippedItems }: PaperdollLayoutProps) {
           ))}
         </div>
 
-        {/* Center — model placeholder */}
+        {/* Center — model viewer or placeholder */}
         <div className="flex items-center justify-center">
-          <div className="aspect-[3/4] min-h-[420px] w-full rounded border border-border/30 bg-[oklch(0.15_0.005_250)] flex items-center justify-center">
-            <span className="text-xs text-muted-foreground/20 select-none">Model</span>
+          <div className="aspect-[3/4] min-h-[420px] w-full rounded border border-border/30 bg-[oklch(0.15_0.005_250)] flex items-center justify-center overflow-hidden">
+            {modelSlot ?? (
+              <span className="text-xs text-muted-foreground/20 select-none">Model</span>
+            )}
           </div>
         </div>
 
