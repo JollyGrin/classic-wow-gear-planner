@@ -3,7 +3,10 @@
 import { useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { PaperdollLayout } from './paperdoll-layout'
+import { LevelScrubber } from '@/app/components/progression/level-scrubber'
 import { Select } from '@/app/components/ui/select'
+import { useItems } from '@/app/hooks/use-items'
+import { computeEquippedAtLevel } from '@/app/lib/progression-utils'
 import { VIEWER_SLOT_MAP, RACE_IDS } from '@/app/lib/viewer-constants'
 import type { Item } from '@/app/lib/types'
 
@@ -28,298 +31,6 @@ const TEST_DISPLAY_IDS: Record<string, number> = {
   Ranged: 29162,
 }
 
-// Test data — real items from the database for visual development
-const TEST_ITEMS: Record<string, Item> = {
-  Head: {
-    itemId: 12640,
-    name: 'Lionheart Helm',
-    icon: 'inv_helmet_36',
-    quality: 'Epic',
-    slot: 'Head',
-    class: 'Armor',
-    subclass: 'Plate',
-    sellPrice: 0,
-    itemLevel: 63,
-    requiredLevel: 56,
-    tooltip: [],
-    itemLink: '',
-    contentPhase: 1,
-    source: null,
-    uniqueName: 'lionheart-helm',
-    stats: { armor: 562, stamina: 20, strength: 25 },
-  },
-  Neck: {
-    itemId: 1443,
-    name: 'Jeweled Amulet of Cainwyn',
-    icon: 'inv_jewelry_amulet_01',
-    quality: 'Epic',
-    slot: 'Neck',
-    class: 'Armor',
-    subclass: 'Miscellaneous',
-    sellPrice: 0,
-    itemLevel: 62,
-    requiredLevel: 55,
-    tooltip: [],
-    itemLink: '',
-    contentPhase: 1,
-    source: null,
-    uniqueName: 'jeweled-amulet',
-    stats: { stamina: 7, intellect: 7, spirit: 7 },
-  },
-  Shoulder: {
-    itemId: 16444,
-    name: "Field Marshal's Silk Spaulders",
-    icon: 'inv_shoulder_23',
-    quality: 'Epic',
-    slot: 'Shoulder',
-    class: 'Armor',
-    subclass: 'Cloth',
-    sellPrice: 0,
-    itemLevel: 71,
-    requiredLevel: 60,
-    tooltip: [],
-    itemLink: '',
-    contentPhase: 1,
-    source: null,
-    uniqueName: 'fm-silk-spaulders',
-    stats: { armor: 80, stamina: 18, intellect: 13 },
-  },
-  Back: {
-    itemId: 3475,
-    name: 'Cloak of Flames',
-    icon: 'inv_misc_cape_08',
-    quality: 'Epic',
-    slot: 'Back',
-    class: 'Armor',
-    subclass: 'Cloth',
-    sellPrice: 0,
-    itemLevel: 62,
-    requiredLevel: 60,
-    tooltip: [],
-    itemLink: '',
-    contentPhase: 1,
-    source: null,
-    uniqueName: 'cloak-of-flames',
-    stats: { armor: 44, fireResist: 15 },
-  },
-  Chest: {
-    itemId: 12641,
-    name: 'Invulnerable Mail',
-    icon: 'inv_chest_chain_07',
-    quality: 'Epic',
-    slot: 'Chest',
-    class: 'Armor',
-    subclass: 'Mail',
-    sellPrice: 0,
-    itemLevel: 63,
-    requiredLevel: 57,
-    tooltip: [],
-    itemLink: '',
-    contentPhase: 1,
-    source: null,
-    uniqueName: 'invulnerable-mail',
-    stats: { armor: 401, stamina: 17 },
-  },
-  Wrist: {
-    itemId: 11679,
-    name: 'Rubicund Armguards',
-    icon: 'inv_bracer_13',
-    quality: 'Rare',
-    slot: 'Wrist',
-    class: 'Armor',
-    subclass: 'Plate',
-    sellPrice: 0,
-    itemLevel: 57,
-    requiredLevel: 50,
-    tooltip: [],
-    itemLink: '',
-    contentPhase: 1,
-    source: null,
-    uniqueName: 'rubicund-armguards',
-    stats: { armor: 275, strength: 12, stamina: 10 },
-  },
-  Hands: {
-    itemId: 12639,
-    name: 'Stronghold Gauntlets',
-    icon: 'inv_gauntlets_30',
-    quality: 'Epic',
-    slot: 'Hands',
-    class: 'Armor',
-    subclass: 'Plate',
-    sellPrice: 0,
-    itemLevel: 63,
-    requiredLevel: 57,
-    tooltip: [],
-    itemLink: '',
-    contentPhase: 1,
-    source: null,
-    uniqueName: 'stronghold-gauntlets',
-    stats: { armor: 450, stamina: 20, strength: 22 },
-  },
-  Waist: {
-    itemId: 14553,
-    name: 'Sash of Mercy',
-    icon: 'inv_belt_09',
-    quality: 'Epic',
-    slot: 'Waist',
-    class: 'Armor',
-    subclass: 'Cloth',
-    sellPrice: 0,
-    itemLevel: 62,
-    requiredLevel: 56,
-    tooltip: [],
-    itemLink: '',
-    contentPhase: 1,
-    source: null,
-    uniqueName: 'sash-of-mercy',
-    stats: { armor: 55, intellect: 15, spirit: 14 },
-  },
-  Legs: {
-    itemId: 14554,
-    name: 'Cloudkeeper Legplates',
-    icon: 'inv_pants_04',
-    quality: 'Epic',
-    slot: 'Legs',
-    class: 'Armor',
-    subclass: 'Plate',
-    sellPrice: 0,
-    itemLevel: 63,
-    requiredLevel: 57,
-    tooltip: [],
-    itemLink: '',
-    contentPhase: 1,
-    source: null,
-    uniqueName: 'cloudkeeper-legplates',
-    stats: { armor: 520, strength: 25, stamina: 15 },
-  },
-  Feet: {
-    itemId: 16437,
-    name: "Marshal's Silk Footwraps",
-    icon: 'inv_boots_cloth_03',
-    quality: 'Epic',
-    slot: 'Feet',
-    class: 'Armor',
-    subclass: 'Cloth',
-    sellPrice: 0,
-    itemLevel: 66,
-    requiredLevel: 60,
-    tooltip: [],
-    itemLink: '',
-    contentPhase: 1,
-    source: null,
-    uniqueName: 'marshal-silk-footwraps',
-    stats: { armor: 65, stamina: 17, intellect: 12 },
-  },
-  Finger: {
-    itemId: 13143,
-    name: 'Mark of the Dragon Lord',
-    icon: 'inv_jewelry_ring_17',
-    quality: 'Epic',
-    slot: 'Finger',
-    class: 'Armor',
-    subclass: 'Miscellaneous',
-    sellPrice: 0,
-    itemLevel: 62,
-    requiredLevel: 56,
-    tooltip: [],
-    itemLink: '',
-    contentPhase: 1,
-    source: null,
-    uniqueName: 'mark-dragon-lord',
-    stats: { stamina: 6, fireResist: 12, shadowResist: 12 },
-  },
-  'Finger 2': {
-    itemId: 11669,
-    name: 'Naglering',
-    icon: 'inv_jewelry_ring_05',
-    quality: 'Rare',
-    slot: 'Finger',
-    class: 'Armor',
-    subclass: 'Miscellaneous',
-    sellPrice: 0,
-    itemLevel: 57,
-    requiredLevel: 54,
-    tooltip: [],
-    itemLink: '',
-    contentPhase: 1,
-    source: null,
-    uniqueName: 'naglering',
-    stats: { strength: 9, stamina: 15 },
-  },
-  Trinket: {
-    itemId: 14557,
-    name: 'The Lion Horn of Stormwind',
-    icon: 'inv_misc_horn_03',
-    quality: 'Epic',
-    slot: 'Trinket',
-    class: 'Armor',
-    subclass: 'Miscellaneous',
-    sellPrice: 0,
-    itemLevel: 63,
-    requiredLevel: 58,
-    tooltip: [],
-    itemLink: '',
-    contentPhase: 1,
-    source: null,
-    uniqueName: 'lion-horn-stormwind',
-    stats: {},
-  },
-  'Main Hand': {
-    itemId: 17070,
-    name: 'Fang of the Mystics',
-    icon: 'inv_weapon_shortblade_06',
-    quality: 'Epic',
-    slot: 'Main Hand',
-    class: 'Weapon',
-    subclass: 'Dagger',
-    sellPrice: 0,
-    itemLevel: 70,
-    requiredLevel: 60,
-    tooltip: [],
-    itemLink: '',
-    contentPhase: 1,
-    source: null,
-    uniqueName: 'fang-of-mystics',
-    stats: { intellect: 8, stamina: 7 },
-  },
-  'Off Hand': {
-    itemId: 17066,
-    name: 'Drillborer Disk',
-    icon: 'inv_shield_10',
-    quality: 'Epic',
-    slot: 'Off Hand',
-    class: 'Armor',
-    subclass: 'Shield',
-    sellPrice: 0,
-    itemLevel: 70,
-    requiredLevel: 60,
-    tooltip: [],
-    itemLink: '',
-    contentPhase: 1,
-    source: null,
-    uniqueName: 'drillborer-disk',
-    stats: { armor: 2489, stamina: 10, strength: 8 },
-  },
-  Ranged: {
-    itemId: 17069,
-    name: "Striker's Mark",
-    icon: 'inv_weapon_bow_08',
-    quality: 'Epic',
-    slot: 'Ranged',
-    class: 'Weapon',
-    subclass: 'Bow',
-    sellPrice: 0,
-    itemLevel: 70,
-    requiredLevel: 60,
-    tooltip: [],
-    itemLink: '',
-    contentPhase: 1,
-    source: null,
-    uniqueName: 'strikers-mark',
-    stats: { agility: 7 },
-  },
-}
-
 const RACE_LABELS: Record<string, string> = {
   human: 'Human',
   orc: 'Orc',
@@ -333,9 +44,37 @@ const RACE_LABELS: Record<string, string> = {
   draenei: 'Draenei',
 }
 
+/** Convert EquippedMap (slot → Item[]) to paperdoll format (slot → Item),
+ *  expanding dual-equip slots like Finger → Finger + Finger 2. */
+function equippedMapToPaperdoll(map: Record<string, Item[]>): Partial<Record<string, Item>> {
+  const result: Record<string, Item> = {}
+  for (const [slot, items] of Object.entries(map)) {
+    if (items[0]) result[slot] = items[0]
+    if (items[1]) result[`${slot} 2`] = items[1]
+  }
+  return result
+}
+
 export function CharacterTab() {
+  const { data: allItems = [] } = useItems()
+  const [selectedLevel, setSelectedLevel] = useState(60)
   const [race, setRace] = useState('human')
   const [gender, setGender] = useState(0)
+
+  const equippedMap = useMemo(
+    () => computeEquippedAtLevel(allItems, selectedLevel),
+    [allItems, selectedLevel]
+  )
+
+  const equippedItems = useMemo(
+    () => equippedMapToPaperdoll(equippedMap),
+    [equippedMap]
+  )
+
+  const itemLevels = useMemo(
+    () => [...new Set(allItems.map((i) => i.requiredLevel))].sort((a, b) => a - b),
+    [allItems]
+  )
 
   const viewerItems = useMemo<[number, number][]>(
     () =>
@@ -346,8 +85,8 @@ export function CharacterTab() {
   )
 
   return (
-    <div className="flex flex-col items-center gap-6">
-      <div className="flex gap-3">
+    <div className="flex flex-col items-center gap-4">
+      <div className="flex items-end gap-3">
         <Select
           value={race}
           onChange={(e) => setRace(e.target.value)}
@@ -368,8 +107,15 @@ export function CharacterTab() {
           <option value={1}>Female</option>
         </Select>
       </div>
+      <div className="w-full max-w-lg">
+        <LevelScrubber
+          level={selectedLevel}
+          onLevelChange={setSelectedLevel}
+          itemLevels={itemLevels}
+        />
+      </div>
       <PaperdollLayout
-        equippedItems={TEST_ITEMS}
+        equippedItems={equippedItems}
         modelSlot={
           <ModelViewer
             race={RACE_IDS[race]}
