@@ -12,15 +12,11 @@ Gear Journey is a WoW Classic (1-60) BiS progression planner. Users search/filte
    - Write tests first (TDD)
 
 2. **During development:**
-   - Follow phase checklist strictly
-   - Check checklist as you progress
-   - Core items block next phase
    - Log any surprises to LEARNINGS.md immediately
 
-3. **Phase completion:**
+3. **Completion:**
    - All unit tests passing
    - All E2E tests passing
-   - Core checklist items done
    - LEARNINGS.md updated if needed
 
 ## Key Patterns
@@ -59,52 +55,23 @@ bun run test:all   # Run both
 ## Don't
 
 - Skip tests to "save time"
-- Start next phase without completing core items
 - Ignore LEARNINGS.md entries
-- Add features not in current phase scope
 - Over-engineer solutions
-- NEVER open items.json, as it's 10mb. You MUST use jq to query exactly what you need, limit results, and avoid crashing your context window.
 
-## Phase Checklist
+## Large JSON Handling
 
-### Phase 0: Foundation ✓
+- NEVER open large JSON files (e.g. `items.json` at 10mb) directly — it will blow up your context window.
+- Use `jq` via Bash to query exactly what you need. Always filter and limit results.
+- Do NOT use Python scripts for JSON exploration — jq is lighter and avoids spawning an interpreter.
 
-- [x] Project scaffolding
-- [x] Tailwind v4 + shadcn/ui
-- [x] CLAUDE.md, LEARNINGS.md, SKILLS.md
-- [x] Vitest + Playwright setup
+Examples:
+```bash
+# Get the structure/keys of the first item
+jq '.[0] | keys' public/data/items.json
 
-### Phase 1: Data Layer ✓
+# Find items by name (case-insensitive, limit 3)
+jq '[.[] | select(.name | test("shadowfang"; "i"))] | .[0:3]' public/data/items.json
 
-- [x] Item TypeScript interface
-- [x] Slot normalization utility
-- [x] Items service
-- [x] Unit tests
-
-### Phase 2: Items Tab ✓
-
-- [x] Search, filter, sort
-- [x] Item list with infinite scroll
-- [x] Add to list button
-- [x] E2E tests
-
-### Phase 3: Progression Tab ✓
-
-- [x] Timeline component
-- [x] Item positioning
-- [x] Stacking logic
-- [x] E2E tests
-
-### Phase 4: Persistence ✓
-
-- [x] Dexie schema
-- [x] CRUD operations
-- [x] URL sharing
-- [x] E2E tests
-
-### Phase 5: Polish ✓
-
-- [x] Responsive design
-- [x] Keyboard shortcuts
-- [x] Loading/error states
-- [x] Accessibility
+# Count items by slot
+jq 'group_by(.slot) | map({slot: .[0].slot, count: length})' public/data/items.json
+```
