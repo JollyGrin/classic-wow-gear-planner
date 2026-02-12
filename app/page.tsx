@@ -4,9 +4,10 @@ import { useState } from 'react'
 import { Button } from '@/app/components/ui/button'
 import { ItemsTab } from '@/app/components/items'
 import { ProgressionTab } from '@/app/components/progression'
+import { CharacterTab } from '@/app/components/character'
 import { useBisList } from '@/app/hooks/use-bis-list'
 
-type Tab = 'items' | 'progression'
+type Tab = 'items' | 'progression' | 'character'
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>('items')
@@ -30,6 +31,12 @@ export default function Home() {
             >
               Progression {items.length > 0 && `(${items.length})`}
             </Button>
+            <Button
+              variant={activeTab === 'character' ? 'default' : 'outline'}
+              onClick={() => setActiveTab('character')}
+            >
+              Character
+            </Button>
           </nav>
         </div>
       </header>
@@ -51,6 +58,7 @@ export default function Home() {
                 onClearAll={clearAll}
               />
             )}
+            {activeTab === 'character' && <CharacterTab />}
           </>
         )}
       </main>
