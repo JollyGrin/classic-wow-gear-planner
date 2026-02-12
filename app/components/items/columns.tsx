@@ -4,17 +4,12 @@ import { createColumnHelper, type SortingFn, type Row } from '@tanstack/react-ta
 import { Check, Plus } from 'lucide-react'
 import { Button } from '@/app/components/ui/button'
 import { cn } from '@/app/lib/utils'
-import type { Item, ItemQuality, StatKey } from '@/app/lib/types'
+import { QUALITY_COLORS } from '@/app/lib/quality'
+import type { Item, StatKey } from '@/app/lib/types'
 
 export const QUALITY_ORDER = ['Uncommon', 'Rare', 'Epic', 'Legendary', 'Heirloom'] as const
 
-export const QUALITY_COLORS: Record<ItemQuality, string> = {
-  Uncommon: 'text-green-500',
-  Rare: 'text-blue-500',
-  Epic: 'text-purple-500',
-  Legendary: 'text-orange-500',
-  Heirloom: 'text-amber-400',
-}
+export { QUALITY_COLORS }
 
 export const qualitySortingFn: SortingFn<Item> = (
   rowA: Row<Item>,

@@ -25,8 +25,11 @@ test('can add item and see it in progression', async ({ page }) => {
   // Switch to progression tab - check for count in button
   await page.getByRole('button', { name: /Progression \(1\)/ }).click()
 
-  // Should show stats with 1 item
-  await expect(page.getByText('Items: 1')).toBeVisible()
+  // Should show the level scrubber
+  await expect(page.getByLabel('Level scrubber')).toBeVisible()
+
+  // Should show stats dashboard with slot count
+  await expect(page.getByText(/slots/)).toBeVisible()
 })
 
 test('can remove item from progression', async ({ page }) => {
@@ -42,17 +45,14 @@ test('can remove item from progression', async ({ page }) => {
   // Switch to progression tab
   await page.getByRole('button', { name: /Progression \(1\)/ }).click()
 
-  // Should show 1 item initially
-  await expect(page.getByText('Items: 1')).toBeVisible()
+  // Should show the grid with an item card
+  await expect(page.getByTestId('item-card').first()).toBeVisible()
 
-  // Wait for the timeline item to appear
-  await expect(page.getByTestId('timeline-item').first()).toBeVisible()
+  // Click the item card to open the detail panel
+  await page.getByTestId('item-card').first().click()
 
-  // Click the remove button using JavaScript (it's hidden with opacity:0 until hover)
-  await page.evaluate(() => {
-    const removeButton = document.querySelector('[aria-label^="Remove"]') as HTMLButtonElement
-    if (removeButton) removeButton.click()
-  })
+  // Click "Remove from list" in the detail panel
+  await page.getByRole('button', { name: 'Remove from list' }).click()
 
   // Should show empty state again
   await expect(page.getByText('No items in your progression list')).toBeVisible()
@@ -72,8 +72,8 @@ test('can clear all items', async ({ page }) => {
   // Switch to progression tab
   await page.getByRole('button', { name: /Progression \(2\)/ }).click()
 
-  // Should show 2 items
-  await expect(page.getByText('Items: 2')).toBeVisible()
+  // Should show item cards
+  await expect(page.getByTestId('item-card').first()).toBeVisible()
 
   // Click clear all
   await page.getByRole('button', { name: /Clear All/ }).click()
@@ -82,7 +82,7 @@ test('can clear all items', async ({ page }) => {
   await expect(page.getByText('No items in your progression list')).toBeVisible()
 })
 
-test('timeline shows level markers', async ({ page }) => {
+test('level scrubber is interactive', async ({ page }) => {
   await page.goto('/')
 
   // Add an item
@@ -92,7 +92,10 @@ test('timeline shows level markers', async ({ page }) => {
   // Switch to progression tab
   await page.getByRole('button', { name: /Progression/ }).click()
 
-  // Should show stats bar
-  await expect(page.getByText('Items: 1')).toBeVisible()
-  await expect(page.getByText(/Levels:/)).toBeVisible()
+  // Level scrubber should be visible
+  const scrubber = page.getByLabel('Level scrubber')
+  await expect(scrubber).toBeVisible()
+
+  // Should show the grid
+  await expect(page.getByRole('grid', { name: 'Gear progression grid' })).toBeVisible()
 })

@@ -28,7 +28,12 @@ export interface TooltipLine {
 
 export interface ItemSource {
   category: SourceCategory
+  name?: string
+  zone?: number
   dropChance?: number
+  quests?: { questId: number; name: string; faction: string }[]
+  cost?: number
+  faction?: string
 }
 
 export interface ItemStats {
