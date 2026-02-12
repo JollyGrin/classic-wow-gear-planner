@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { PaperdollLayout } from './paperdoll-layout'
-import { VIEWER_SLOT_MAP } from '@/app/lib/viewer-constants'
+import { Select } from '@/app/components/ui/select'
+import { VIEWER_SLOT_MAP, RACE_IDS } from '@/app/lib/viewer-constants'
 import type { Item } from '@/app/lib/types'
 
 const ModelViewer = dynamic(
@@ -319,7 +320,23 @@ const TEST_ITEMS: Record<string, Item> = {
   },
 }
 
+const RACE_LABELS: Record<string, string> = {
+  human: 'Human',
+  orc: 'Orc',
+  dwarf: 'Dwarf',
+  nightelf: 'Night Elf',
+  undead: 'Undead',
+  tauren: 'Tauren',
+  gnome: 'Gnome',
+  troll: 'Troll',
+  bloodelf: 'Blood Elf',
+  draenei: 'Draenei',
+}
+
 export function CharacterTab() {
+  const [race, setRace] = useState('human')
+  const [gender, setGender] = useState(0)
+
   const viewerItems = useMemo<[number, number][]>(
     () =>
       Object.entries(TEST_DISPLAY_IDS)
@@ -330,10 +347,35 @@ export function CharacterTab() {
 
   return (
     <div className="flex flex-col items-center gap-6">
+      <div className="flex gap-3">
+        <Select
+          value={race}
+          onChange={(e) => setRace(e.target.value)}
+          className="w-32"
+        >
+          {Object.keys(RACE_IDS).map((r) => (
+            <option key={r} value={r}>
+              {RACE_LABELS[r]}
+            </option>
+          ))}
+        </Select>
+        <Select
+          value={gender}
+          onChange={(e) => setGender(Number(e.target.value))}
+          className="w-28"
+        >
+          <option value={0}>Male</option>
+          <option value={1}>Female</option>
+        </Select>
+      </div>
       <PaperdollLayout
         equippedItems={TEST_ITEMS}
         modelSlot={
-          <ModelViewer race={1} gender={0} items={viewerItems} />
+          <ModelViewer
+            race={RACE_IDS[race]}
+            gender={gender}
+            items={viewerItems}
+          />
         }
       />
     </div>
