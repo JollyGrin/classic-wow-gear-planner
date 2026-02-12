@@ -26,11 +26,9 @@ export function DataTable({ table }: DataTableProps) {
 
   const headerGroups = table.getHeaderGroups()
   const leftPinnedColumns = table.getLeftVisibleLeafColumns()
-  const rightPinnedColumns = table.getRightVisibleLeafColumns()
   const getColumnPinStyle = useCallback(
     (columnId: string): React.CSSProperties => {
       const isLeftPinned = leftPinnedColumns.some((c) => c.id === columnId)
-      const isRightPinned = rightPinnedColumns.some((c) => c.id === columnId)
 
       if (isLeftPinned) {
         let left = 0
@@ -45,31 +43,14 @@ export function DataTable({ table }: DataTableProps) {
         }
       }
 
-      if (isRightPinned) {
-        let right = 0
-        const reversed = [...rightPinnedColumns].reverse()
-        for (const col of reversed) {
-          if (col.id === columnId) break
-          right += col.getSize()
-        }
-        return {
-          position: 'sticky',
-          right,
-          zIndex: 1,
-        }
-      }
-
       return {}
     },
-    [leftPinnedColumns, rightPinnedColumns]
+    [leftPinnedColumns]
   )
 
   const isLastLeftPinned = (columnId: string) =>
     leftPinnedColumns.length > 0 &&
     leftPinnedColumns[leftPinnedColumns.length - 1].id === columnId
-
-  const isFirstRightPinned = (columnId: string) =>
-    rightPinnedColumns.length > 0 && rightPinnedColumns[0].id === columnId
 
   if (rows.length === 0) {
     return (
@@ -102,7 +83,7 @@ export function DataTable({ table }: DataTableProps) {
                     'flex items-center px-2 text-xs font-medium text-muted-foreground bg-background select-none',
                     canSort && 'cursor-pointer hover:text-foreground',
                     isLastLeftPinned(header.column.id) && 'shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]',
-                    isFirstRightPinned(header.column.id) && 'shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.15)]'
+
                   )}
                   style={{
                     width: header.getSize(),
@@ -154,7 +135,7 @@ export function DataTable({ table }: DataTableProps) {
                     className={cn(
                       'flex items-center px-2 text-sm bg-background',
                       isLastLeftPinned(cell.column.id) && 'shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]',
-                      isFirstRightPinned(cell.column.id) && 'shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.15)]'
+
                     )}
                     style={{
                       width: cell.column.getSize(),

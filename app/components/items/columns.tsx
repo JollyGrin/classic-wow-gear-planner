@@ -58,17 +58,38 @@ export const columns = [
     cell: (info) => {
       const item = info.row.original
       const iconUrl = `https://wow.zamimg.com/images/wow/icons/small/${item.icon}.jpg`
+      const { onAddItem, hasItem } = info.table.options.meta as {
+        onAddItem?: (item: Item) => void
+        hasItem?: (itemId: number) => boolean
+      }
       return (
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 w-full">
           <img
             src={iconUrl}
             alt=""
             className="h-6 w-6 rounded border border-border shrink-0"
             loading="lazy"
           />
-          <span className={cn('truncate', QUALITY_COLORS[item.quality])}>
+          <span className={cn('truncate flex-1', QUALITY_COLORS[item.quality])}>
             {item.name}
           </span>
+          {onAddItem && (
+            hasItem?.(item.itemId) ? (
+              <div className="flex items-center justify-center text-green-500 shrink-0">
+                <Check className="h-4 w-4" />
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0"
+                onClick={() => onAddItem(item)}
+                aria-label={`Add ${item.name} to list`}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            )
+          )}
         </div>
       )
     },
@@ -124,36 +145,4 @@ export const columns = [
   statColumn('SR', 'shadowResist', 40),
   statColumn('AR', 'arcaneResist', 40),
 
-  // Actions column
-  columnHelper.display({
-    id: 'actions',
-    size: 48,
-    enableHiding: false,
-    cell: (info) => {
-      const { onAddItem, hasItem } = info.table.options.meta as {
-        onAddItem?: (item: Item) => void
-        hasItem?: (itemId: number) => boolean
-      }
-      const item = info.row.original
-      if (!onAddItem) return null
-      if (hasItem?.(item.itemId)) {
-        return (
-          <div className="flex items-center justify-center text-green-500">
-            <Check className="h-4 w-4" />
-          </div>
-        )
-      }
-      return (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => onAddItem(item)}
-          aria-label={`Add ${item.name} to list`}
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </Button>
-      )
-    },
-  }),
 ]

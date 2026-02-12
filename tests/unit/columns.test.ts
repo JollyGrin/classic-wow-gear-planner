@@ -31,12 +31,11 @@ function findColumn(id: string): ColDef | undefined {
 
 describe('columns', () => {
   it('produces the correct number of column definitions', () => {
-    expect(columns).toHaveLength(18)
+    expect(columns).toHaveLength(17)
   })
 
-  it('has item column as first and actions as last', () => {
+  it('has item column as first', () => {
     expect(columns[0].id).toBe('item')
-    expect(columns[columns.length - 1].id).toBe('actions')
   })
 })
 

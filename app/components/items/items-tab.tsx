@@ -44,7 +44,6 @@ export function ItemsTab({ onAddItem, hasItem }: ItemsTabProps) {
   })
   const [columnPinning] = useState<ColumnPinningState>({
     left: ['item'],
-    right: ['actions'],
   })
   const searchInputRef = useRef<HTMLInputElement>(null)
 
