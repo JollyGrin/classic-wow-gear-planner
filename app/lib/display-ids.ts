@@ -29,7 +29,7 @@ export async function fetchDisplayId(itemId: number): Promise<number> {
 }
 
 /** Resolve display IDs for a batch of item IDs. Returns { itemId: displayId } */
-export async function fetchDisplayIds(
+async function fetchBatch(
   itemIds: number[]
 ): Promise<Record<number, number>> {
   const results = await Promise.all(
@@ -73,7 +73,7 @@ export function useDisplayIds(itemIds: number[]) {
 
     if (toFetch.length === 0) return
 
-    fetchDisplayIds(toFetch).then((results) => {
+    fetchBatch(toFetch).then((results) => {
       if (!cancelled) {
         setDisplayIds((prev) => ({ ...prev, ...results }))
       }

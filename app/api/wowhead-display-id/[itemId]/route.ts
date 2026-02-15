@@ -1,4 +1,9 @@
-const cache = new Map<string, number>()
+interface CacheEntry {
+  displayId: number
+  slotId: number
+}
+
+const cache = new Map<string, CacheEntry>()
 
 export async function GET(
   _request: Request,
@@ -7,7 +12,7 @@ export async function GET(
   const { itemId } = await params
 
   if (cache.has(itemId)) {
-    return Response.json({ displayId: cache.get(itemId) })
+    return Response.json(cache.get(itemId))
   }
 
   try {
@@ -22,22 +27,24 @@ export async function GET(
     )
 
     if (!res.ok) {
-      return Response.json({ displayId: 0 })
+      return Response.json({ displayId: 0, slotId: 0 })
     }
 
     const xml = await res.text()
-    const match = xml.match(/displayId="(\d+)"/)
-    const displayId = match ? Number(match[1]) : 0
+    const displayMatch = xml.match(/displayId="(\d+)"/)
+    const slotMatch = xml.match(/inventorySlot id="(\d+)"/)
+    const displayId = displayMatch ? Number(displayMatch[1]) : 0
+    const slotId = slotMatch ? Number(slotMatch[1]) : 0
 
+    const entry = { displayId, slotId }
     if (displayId > 0) {
-      cache.set(itemId, displayId)
+      cache.set(itemId, entry)
     }
 
-    return Response.json(
-      { displayId },
-      { headers: { 'Cache-Control': 'public, max-age=86400' } }
-    )
+    return Response.json(entry, {
+      headers: { 'Cache-Control': 'public, max-age=86400' },
+    })
   } catch {
-    return Response.json({ displayId: 0 }, { status: 502 })
+    return Response.json({ displayId: 0, slotId: 0 }, { status: 502 })
   }
 }

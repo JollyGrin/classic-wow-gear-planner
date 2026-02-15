@@ -1,4 +1,7 @@
-/** Equipment slot name → ZamModelViewer slot ID */
+/** Normalized slot name → ZamModelViewer inventory type ID.
+ *  Slots 1–10 are the same as equipment slots. Back, weapons, and ranged
+ *  use the WoW InventoryType enum (16, 21, 22, 26) which the viewer needs
+ *  to pick the correct CDN path and body position. */
 export const VIEWER_SLOT_MAP: Record<string, number> = {
   Head: 1,
   Shoulder: 3,
@@ -8,10 +11,10 @@ export const VIEWER_SLOT_MAP: Record<string, number> = {
   Feet: 8,
   Wrist: 9,
   Hands: 10,
-  Back: 15,
-  'Main Hand': 16,
-  'Off Hand': 17,
-  Ranged: 18,
+  Back: 16,
+  'Main Hand': 21,
+  'Off Hand': 22,
+  Ranged: 26,
 }
 
 /** Race name → ZamModelViewer race ID */
