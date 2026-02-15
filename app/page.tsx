@@ -58,7 +58,7 @@ export default function Home() {
                 onClearAll={clearAll}
               />
             )}
-            {activeTab === 'character' && <CharacterTab />}
+            {activeTab === 'character' && <CharacterTab items={items} />}
           </>
         )}
       </main>

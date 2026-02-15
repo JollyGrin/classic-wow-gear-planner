@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import { PaperdollLayout } from './paperdoll-layout'
 import { LevelScrubber } from '@/app/components/progression/level-scrubber'
 import { Select } from '@/app/components/ui/select'
-import { useItems } from '@/app/hooks/use-items'
+import { useDisplayIds } from '@/app/lib/display-ids'
 import { computeEquippedAtLevel } from '@/app/lib/progression-utils'
 import { VIEWER_SLOT_MAP, RACE_IDS } from '@/app/lib/viewer-constants'
 import type { Item } from '@/app/lib/types'
@@ -14,22 +14,6 @@ const ModelViewer = dynamic(
   () => import('./model-viewer').then((m) => ({ default: m.ModelViewer })),
   { ssr: false }
 )
-
-// Test display IDs extracted from item_template.sql
-const TEST_DISPLAY_IDS: Record<string, number> = {
-  Head: 22920,
-  Shoulder: 33004,
-  Back: 23421,
-  Chest: 25748,
-  Wrist: 28820,
-  Hands: 25750,
-  Waist: 28386,
-  Legs: 25343,
-  Feet: 33009,
-  'Main Hand': 29706,
-  'Off Hand': 29701,
-  Ranged: 29162,
-}
 
 const RACE_LABELS: Record<string, string> = {
   human: 'Human',
@@ -55,15 +39,14 @@ function equippedMapToPaperdoll(map: Record<string, Item[]>): Partial<Record<str
   return result
 }
 
-export function CharacterTab() {
-  const { data: allItems = [] } = useItems()
+export function CharacterTab({ items }: { items: Item[] }) {
   const [selectedLevel, setSelectedLevel] = useState(60)
   const [race, setRace] = useState('human')
   const [gender, setGender] = useState(0)
 
   const equippedMap = useMemo(
-    () => computeEquippedAtLevel(allItems, selectedLevel),
-    [allItems, selectedLevel]
+    () => computeEquippedAtLevel(items, selectedLevel),
+    [items, selectedLevel]
   )
 
   const equippedItems = useMemo(
@@ -72,17 +55,34 @@ export function CharacterTab() {
   )
 
   const itemLevels = useMemo(
-    () => [...new Set(allItems.map((i) => i.requiredLevel))].sort((a, b) => a - b),
-    [allItems]
+    () => [...new Set(items.map((i) => i.requiredLevel))].sort((a, b) => a - b),
+    [items]
   )
 
-  const viewerItems = useMemo<[number, number][]>(
-    () =>
-      Object.entries(TEST_DISPLAY_IDS)
-        .filter(([slot]) => slot in VIEWER_SLOT_MAP)
-        .map(([slot, displayId]) => [VIEWER_SLOT_MAP[slot], displayId]),
-    []
-  )
+  // Collect item IDs from equipped items that have viewer slots
+  const equippedItemIds = useMemo(() => {
+    const ids: number[] = []
+    for (const [slot, slotItems] of Object.entries(equippedMap)) {
+      if (!(slot in VIEWER_SLOT_MAP)) continue
+      if (slotItems[0]) ids.push(slotItems[0].itemId)
+    }
+    return ids
+  }, [equippedMap])
+
+  const { getDisplayId, displayIds } = useDisplayIds(equippedItemIds)
+
+  const viewerItems = useMemo<[number, number][]>(() => {
+    const pairs: [number, number][] = []
+    for (const [slot, slotItems] of Object.entries(equippedMap)) {
+      const viewerSlot = VIEWER_SLOT_MAP[slot]
+      if (viewerSlot === undefined) continue
+      const item = slotItems[0]
+      if (!item) continue
+      const displayId = getDisplayId(item.itemId)
+      if (displayId) pairs.push([viewerSlot, displayId])
+    }
+    return pairs
+  }, [equippedMap, displayIds, getDisplayId])
 
   return (
     <div className="flex flex-col items-center gap-4">
