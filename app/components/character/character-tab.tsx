@@ -43,6 +43,7 @@ export function CharacterTab({ items }: { items: Item[] }) {
   const [selectedLevel, setSelectedLevel] = useState(60)
   const [race, setRace] = useState('human')
   const [gender, setGender] = useState(0)
+  const [debugAnimations, setDebugAnimations] = useState(false)
 
   const equippedMap = useMemo(
     () => computeEquippedAtLevel(items, selectedLevel),
@@ -106,6 +107,13 @@ export function CharacterTab({ items }: { items: Item[] }) {
           <option value={0}>Male</option>
           <option value={1}>Female</option>
         </Select>
+        <button
+          onClick={() => setDebugAnimations((d) => !d)}
+          className={`rounded border px-2 py-1 text-xs ${debugAnimations ? 'border-yellow-500 bg-yellow-500/20 text-yellow-400' : 'border-gray-600 text-gray-400 hover:border-gray-400'}`}
+          title="Toggle animation debug panel"
+        >
+          Anim Debug
+        </button>
       </div>
       <div className="w-full max-w-lg">
         <LevelScrubber
@@ -121,6 +129,7 @@ export function CharacterTab({ items }: { items: Item[] }) {
             race={RACE_IDS[race]}
             gender={gender}
             items={viewerItems}
+            debug={debugAnimations}
           />
         }
       />
