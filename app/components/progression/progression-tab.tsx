@@ -8,6 +8,7 @@ import {
   computeEquippedAtLevel,
   aggregateStats,
 } from '@/app/lib/progression-utils'
+import { useLevel } from '@/app/hooks/use-level'
 import { LevelScrubber } from './level-scrubber'
 import { StatsDashboard } from './stats-dashboard'
 import { SwimlanesGrid } from './swimlanes-grid'
@@ -25,12 +26,7 @@ const TOTAL_EQUIPMENT_SLOTS = EQUIPMENT_SLOTS.filter(
 ).length
 
 export function ProgressionTab({ items, onRemoveItem, onClearAll }: ProgressionTabProps) {
-  const maxLevel = useMemo(
-    () => (items.length > 0 ? Math.max(...items.map((i) => i.requiredLevel)) : 60),
-    [items],
-  )
-
-  const [selectedLevel, setSelectedLevel] = useState(maxLevel)
+  const { selectedLevel, setSelectedLevel } = useLevel()
   const [selectedItem, setSelectedItem] = useState<Item | null>(null)
 
   // Item levels for scrubber tick marks

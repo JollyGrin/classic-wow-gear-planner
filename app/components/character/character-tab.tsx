@@ -6,6 +6,7 @@ import { PaperdollLayout } from './paperdoll-layout'
 import { LevelScrubber } from '@/app/components/progression/level-scrubber'
 import { Select } from '@/app/components/ui/select'
 import { useDisplayIds } from '@/app/lib/display-ids'
+import { useLevel } from '@/app/hooks/use-level'
 import { computeEquippedAtLevel } from '@/app/lib/progression-utils'
 import { VIEWER_SLOT_MAP, RACE_IDS } from '@/app/lib/viewer-constants'
 import type { Item } from '@/app/lib/types'
@@ -40,7 +41,7 @@ function equippedMapToPaperdoll(map: Record<string, Item[]>): Partial<Record<str
 }
 
 export function CharacterTab({ items }: { items: Item[] }) {
-  const [selectedLevel, setSelectedLevel] = useState(60)
+  const { selectedLevel, setSelectedLevel } = useLevel()
   const [race, setRace] = useState('human')
   const [gender, setGender] = useState(0)
   const [debugAnimations, setDebugAnimations] = useState(false)
