@@ -246,7 +246,7 @@ export function ModelViewer({
         type: 2,
         contentPath: CONTENT_PATH,
         container: window.jQuery(`#${idRef.current}`),
-        aspect: 1,
+        aspect: 3 / 4,
         dataEnv: 'classic',
         env: 'classic',
         gameDataEnv: 'classic',
@@ -280,7 +280,7 @@ export function ModelViewer({
   }, [race, gender, items])
 
   return (
-    <div className="relative" style={{ width: '100%', height: '100%' }}>
+    <div className="relative overflow-hidden" style={{ width: '100%', height: '100%' }}>
       <div
         ref={containerRef}
         className={className}
