@@ -100,3 +100,18 @@ Each entry follows Problem/Solution format:
 **Final Solution:** Changed the viewer config `aspect` from `1` (square) to `3/4` to match the paperdoll container's `aspect-[3/4]` CSS. The viewer renders its canvas at whatever aspect ratio is specified in config — it must match the CSS container's aspect ratio.
 
 **Insight:** ZamModelViewer's `aspect` config controls the canvas rendering ratio, not just cropping. Mismatch with the CSS container creates dead space. Always keep `config.aspect` in sync with the container's CSS aspect ratio.
+
+---
+
+### 2026-02-16 - ZamModelViewer camera state preservation across recreations
+
+**Problem:** When the viewer is destroyed and recreated (e.g. items change on level scrub), the camera orientation (azimuth/zenith/distance) resets to defaults, losing the user's viewing angle.
+
+**Attempted Solutions:**
+1. Passed `azimuth`, `zenith`, `distance` in the ZamModelViewer config object — viewer ignores unknown config keys, no effect.
+2. Set `renderer.azimuth/zenith/distance` directly after model load — worked once but the renderer's internal initialization overwrites values after a few frames.
+3. Used `requestAnimationFrame` loop (10 frames) to repeatedly apply saved values after model load — worked for the first recreation but broke on subsequent ones because camera state was read from the renderer at destroy time, by which point the renderer had drifted back to defaults.
+
+**Final Solution:** Two-part fix: (1) Track camera state via `mouseup` and `wheel` event listeners on the container, saving `renderer.azimuth/zenith/distance` to a ref on every user interaction — this captures the user's intended orientation, not the renderer's drifted state. (2) Restore via `requestAnimationFrame` loop (10 frames) after model loads. Also stabilized the `items` prop with `JSON.stringify` to avoid unnecessary destroy/recreate cycles when the array reference changes but values haven't.
+
+**Insight:** Don't read camera state from the ZamModelViewer renderer at arbitrary times (e.g. during cleanup) — internal animation/interpolation may have drifted values away from what the user set. Instead, capture state at the moment of user interaction (mouseup/wheel). The renderer's `azimuth`, `zenith`, `distance` properties are readable and writable, but the renderer's own init sequence will overwrite them, so restoration must be deferred via rAF after the model fully loads.
