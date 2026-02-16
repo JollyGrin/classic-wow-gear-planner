@@ -62,7 +62,7 @@ function setupWowheadGlobals() {
     const webp = { getImageExtension: () => '.webp' }
     window.WH = {
       debug: (...args: unknown[]) => console.log(args),
-      defaultAnimation: 'Stand',
+      defaultAnimation: 'Walk',
       WebP: webp,
       Wow: {
         Item: {
@@ -263,6 +263,19 @@ export function ModelViewer({
         if (!cancelled) {
           viewerRef.current = viewer
           setViewerReady(true)
+          // Wait for model to fully load, then zero blend times and set Walk
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const v = viewer as any
+          const waitForModel = setInterval(() => {
+            if (cancelled) { clearInterval(waitForModel); return }
+            const seqs = v.renderer?.actors?.[0]?.c?.k?.x
+            if (Array.isArray(seqs) && seqs.length > 0 && seqs[0]?.l) {
+              clearInterval(waitForModel)
+              if (v.renderer) v.renderer.crossFadeDuration = 0
+              for (const seq of seqs) { seq.d = 0; seq.j = 0 }
+              v.method?.('setAnimation', 'Walk')
+            }
+          }, 200)
         }
       } catch (err) {
         console.error('Model viewer init error:', err)
