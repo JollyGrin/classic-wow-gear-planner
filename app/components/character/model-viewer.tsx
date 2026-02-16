@@ -19,7 +19,7 @@ const CONTENT_PATH = '/api/wowhead-proxy/modelviewer/classic/'
 const NOT_DISPLAYED_SLOTS = [2, 11, 12, 13, 14]
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type ViewerInstance = { destroy?: () => void; renderer?: { actors?: any[] } }
+type ViewerInstance = { destroy?: () => void; renderer?: { actors?: any[]; azimuth?: number; zenith?: number; distance?: number } }
 
 interface ModelViewerProps {
   race?: number
@@ -224,7 +224,13 @@ export function ModelViewer({
   const containerRef = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<ViewerInstance | null>(null)
   const idRef = useRef(`model-viewer-${Math.random().toString(36).slice(2, 9)}`)
+  const cameraRef = useRef<{ azimuth: number; zenith: number; distance: number } | null>(null)
+  const animationRef = useRef<string | null>(null)
   const [viewerReady, setViewerReady] = useState(false)
+
+  // Stabilize items to avoid unnecessary recreations when the array
+  // reference changes but the actual [slot, displayId] pairs haven't
+  const itemsKey = JSON.stringify(items)
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -240,7 +246,8 @@ export function ModelViewer({
       if (cancelled) return
 
       const raceGenderId = race * 2 - 1 + gender
-      const filteredItems = items.filter(([slot]) => !NOT_DISPLAYED_SLOTS.includes(slot))
+      const parsedItems: [number, number][] = JSON.parse(itemsKey)
+      const filteredItems = parsedItems.filter(([slot]) => !NOT_DISPLAYED_SLOTS.includes(slot))
 
       const config: Record<string, unknown> = {
         type: 2,
@@ -263,9 +270,24 @@ export function ModelViewer({
         if (!cancelled) {
           viewerRef.current = viewer
           setViewerReady(true)
-          // Wait for model to fully load, then zero blend times and set Walk
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const v = viewer as any
+
+          // Track camera state on user interaction so cameraRef always
+          // reflects the user's intended orientation (not renderer drift)
+          const saveCamera = () => {
+            if (v.renderer) {
+              cameraRef.current = {
+                azimuth: v.renderer.azimuth,
+                zenith: v.renderer.zenith,
+                distance: v.renderer.distance,
+              }
+            }
+          }
+          container.addEventListener('mouseup', saveCamera)
+          container.addEventListener('wheel', saveCamera)
+
+          // Wait for model to fully load, then zero blend times and restore state
           const waitForModel = setInterval(() => {
             if (cancelled) { clearInterval(waitForModel); return }
             const seqs = v.renderer?.actors?.[0]?.c?.k?.x
@@ -273,7 +295,28 @@ export function ModelViewer({
               clearInterval(waitForModel)
               if (v.renderer) v.renderer.crossFadeDuration = 0
               for (const seq of seqs) { seq.d = 0; seq.j = 0 }
-              v.method?.('setAnimation', 'Walk')
+
+              // Restore animation, falling back to Walk
+              const anim = animationRef.current || 'Walk'
+              if (window.WH) {
+                ;(window.WH as Record<string, unknown>).defaultAnimation = anim
+              }
+              v.method?.('setAnimation', anim)
+
+              // Restore camera orientation from previous instance
+              if (cameraRef.current && v.renderer) {
+                const saved = { ...cameraRef.current }
+                let restoreCount = 0
+                const restoreCamera = () => {
+                  if (cancelled || restoreCount >= 10) return
+                  restoreCount++
+                  v.renderer.azimuth = saved.azimuth
+                  v.renderer.zenith = saved.zenith
+                  v.renderer.distance = saved.distance
+                  requestAnimationFrame(restoreCamera)
+                }
+                requestAnimationFrame(restoreCamera)
+              }
             }
           }, 200)
         }
@@ -286,11 +329,19 @@ export function ModelViewer({
 
     return () => {
       cancelled = true
+      // cameraRef is kept up-to-date by mouseup/wheel listeners,
+      // so no need to read from renderer here (it may have drifted)
+      // Save current animation
+      const defaultAnim = window.WH?.defaultAnimation
+      if (typeof defaultAnim === 'string') {
+        animationRef.current = defaultAnim
+      }
       viewerRef.current?.destroy?.()
       container.innerHTML = ''
       viewerRef.current = null
     }
-  }, [race, gender, items])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [race, gender, itemsKey])
 
   return (
     <div className="relative overflow-hidden" style={{ width: '100%', height: '100%' }}>
