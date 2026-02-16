@@ -224,7 +224,7 @@ export function ModelViewer({
   const containerRef = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<ViewerInstance | null>(null)
   const idRef = useRef(`model-viewer-${Math.random().toString(36).slice(2, 9)}`)
-  const cameraRef = useRef<{ azimuth: number; zenith: number; distance: number } | null>(null)
+  const cameraRef = useRef<{ azimuth: number; zenith: number; distance: number; zoomTarget: number; zoomCurrent: number } | null>(null)
   const animationRef = useRef<string | null>(null)
   const [viewerReady, setViewerReady] = useState(false)
 
@@ -239,6 +239,7 @@ export function ModelViewer({
     container.id = idRef.current
 
     let cancelled = false
+    let cameraPollId: ReturnType<typeof setInterval> | null = null
     setViewerReady(false)
 
     const initViewer = async () => {
@@ -273,19 +274,19 @@ export function ModelViewer({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const v = viewer as any
 
-          // Track camera state on user interaction so cameraRef always
-          // reflects the user's intended orientation (not renderer drift)
-          const saveCamera = () => {
+          // Continuously poll camera state so cameraRef always has
+          // the latest values regardless of interaction type or timing
+          cameraPollId = setInterval(() => {
             if (v.renderer) {
               cameraRef.current = {
                 azimuth: v.renderer.azimuth,
                 zenith: v.renderer.zenith,
                 distance: v.renderer.distance,
+                zoomTarget: v.renderer.zoom?.target ?? 1,
+                zoomCurrent: v.renderer.zoom?.current ?? 1,
               }
             }
-          }
-          container.addEventListener('mouseup', saveCamera)
-          container.addEventListener('wheel', saveCamera)
+          }, 250)
 
           // Wait for model to fully load, then zero blend times and restore state
           const waitForModel = setInterval(() => {
@@ -303,19 +304,16 @@ export function ModelViewer({
               }
               v.method?.('setAnimation', anim)
 
-              // Restore camera orientation from previous instance
+              // Restore camera orientation and zoom from previous instance
               if (cameraRef.current && v.renderer) {
                 const saved = { ...cameraRef.current }
-                let restoreCount = 0
-                const restoreCamera = () => {
-                  if (cancelled || restoreCount >= 10) return
-                  restoreCount++
-                  v.renderer.azimuth = saved.azimuth
-                  v.renderer.zenith = saved.zenith
-                  v.renderer.distance = saved.distance
-                  requestAnimationFrame(restoreCamera)
+                v.renderer.azimuth = saved.azimuth
+                v.renderer.zenith = saved.zenith
+                v.renderer.distance = saved.distance
+                if (v.renderer.zoom) {
+                  v.renderer.zoom.target = saved.zoomTarget
+                  v.renderer.zoom.current = saved.zoomCurrent
                 }
-                requestAnimationFrame(restoreCamera)
               }
             }
           }, 200)
@@ -329,8 +327,9 @@ export function ModelViewer({
 
     return () => {
       cancelled = true
-      // cameraRef is kept up-to-date by mouseup/wheel listeners,
-      // so no need to read from renderer here (it may have drifted)
+      if (cameraPollId) clearInterval(cameraPollId)
+      // cameraRef is kept up-to-date by polling,
+      // so no need to read from renderer here
       // Save current animation
       const defaultAnim = window.WH?.defaultAnimation
       if (typeof defaultAnim === 'string') {
