@@ -118,93 +118,57 @@ function AnimationDebugPanel({ viewer }: { viewer: ViewerInstance }) {
   const [animations, setAnimations] = useState<string[]>([])
   const [currentAnim, setCurrentAnim] = useState('Stand')
   const [paused, setPaused] = useState(false)
+  const blendsZeroed = useRef(false)
 
   const getActor = useCallback(() => {
     return viewer?.renderer?.actors?.[0]
   }, [viewer])
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getSeqs = useCallback((): any[] | null => {
+    const seqs = getActor()?.c?.k?.x
+    return Array.isArray(seqs) ? seqs : null
+  }, [getActor])
+
   useEffect(() => {
     let attempts = 0
     const interval = setInterval(() => {
       attempts++
-      const renderer = viewer?.renderer
-      // Log structure on first few attempts to help debug
-      if (attempts === 1) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const actor = renderer?.actors?.[0] as any
-        if (actor) {
-          console.log('[AnimDebug] actor full:', actor)
-          console.log('[AnimDebug] actor.c full:', actor.c)
-          if (actor.c?.k) {
-            console.log('[AnimDebug] actor.c.k keys:', Object.keys(actor.c.k).join(', '))
-            console.log('[AnimDebug] actor.c.k full:', actor.c.k)
-          }
-        }
-      }
-
-      // Animation names live at actor.c.k.x[].l in this minified build
-      const actor = getActor()
-      const seqs = actor?.c?.k?.x
-      if (Array.isArray(seqs) && seqs.length > 0 && seqs[0]?.l) {
-        const unique = [...new Set(seqs.map((e: { l: string }) => e.l))]
-        console.log('[AnimDebug] Found', unique.length, 'unique animations')
-        setAnimations(unique)
+      const seqs = getSeqs()
+      if (seqs && seqs.length > 0 && seqs[0]?.l) {
+        setAnimations([...new Set(seqs.map((e: { l: string }) => e.l))])
         clearInterval(interval)
       }
-
-      // Stop polling after 20 seconds
-      if (attempts > 40) {
-        console.log('[AnimDebug] Gave up after 20s')
-        clearInterval(interval)
-      }
+      if (attempts > 40) clearInterval(interval)
     }, 500)
     return () => clearInterval(interval)
-  }, [getActor, viewer])
+  }, [getSeqs])
 
   const handleAnimChange = (name: string) => {
     setCurrentAnim(name)
     setPaused(false)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const actor = getActor() as any
-    if (!actor) return
-
-    // Find the sequence index for this animation name
-    const seqs: Array<{ l: string }> = actor.c?.k?.x ?? []
-    const idx = seqs.findIndex((e: { l: string }) => e.l === name)
-    console.log(`[AnimDebug] Setting animation "${name}" (index ${idx})`)
-
-    // Try approach 1: actor proto methods that might set animation
-    // actor proto: E, u, ed, ih, ut, kj, G, yx, w, q, K, F, cba, D, M, O, b, e, g
-    // Try each single-letter method with the animation name or index
-    for (const method of ['E', 'G', 'D', 'M', 'O', 'b', 'e', 'g', 'u', 'w', 'K', 'F', 'q']) {
-      try {
-        if (typeof actor[method] === 'function') {
-          // Don't actually call them all blindly - just log which exist
-        }
-      } catch { /* ignore */ }
-    }
-
-    // Try approach 2: viewer.method() dispatcher (used by Paperdoll.js)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const v = viewer as any
-    try {
-      v?.method?.('setAnimation', name)
-      console.log('[AnimDebug] viewer.method("setAnimation", name) - no error')
-    } catch (err) {
-      console.log('[AnimDebug] viewer.method("setAnimation") failed:', err)
-    }
+    const renderer = v?.renderer
 
-    // Try approach 3: set on actor.c.k directly (the animation controller)
-    const k = actor.c?.k
-    if (k) {
-      // Look for current animation index property
-      const kKeys = Object.keys(k)
-      for (const kk of kKeys) {
-        if (typeof k[kk] === 'number' && k[kk] >= 0 && k[kk] < seqs.length) {
-          console.log(`[AnimDebug] actor.c.k.${kk} = ${k[kk]} (could be anim index, "${seqs[k[kk]]}")`)
+    // Zero out all blend/transition times once so looping is seamless
+    if (!blendsZeroed.current) {
+      blendsZeroed.current = true
+      if (renderer) renderer.crossFadeDuration = 0
+      const seqs = getSeqs()
+      if (seqs) {
+        for (const seq of seqs) {
+          seq.d = 0  // blend time field 1
+          seq.j = 0  // blend time field 2
         }
       }
     }
+
+    // Set as default animation so the viewer loops it naturally
+    if (window.WH) {
+      ;(window.WH as Record<string, unknown>).defaultAnimation = name
+    }
+    v?.method?.('setAnimation', name)
   }
 
   const togglePause = () => {
@@ -212,12 +176,7 @@ function AnimationDebugPanel({ viewer }: { viewer: ViewerInstance }) {
     setPaused(next)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const v = viewer as any
-    try {
-      v?.method?.('setAnimPaused', next)
-      console.log(`[AnimDebug] viewer.method("setAnimPaused", ${next}) - no error`)
-    } catch (err) {
-      console.log('[AnimDebug] setAnimPaused failed:', err)
-    }
+    v?.method?.('setAnimPaused', next)
   }
 
   if (animations.length === 0) {
