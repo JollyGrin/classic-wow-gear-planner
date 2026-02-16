@@ -5,13 +5,13 @@ import dynamic from 'next/dynamic'
 import { PaperdollLayout } from './paperdoll-layout'
 import { LevelScrubber } from '@/app/components/progression/level-scrubber'
 import { Select } from '@/app/components/ui/select'
-import { useDisplayIds } from '@/app/lib/display-ids'
+import { useDisplayIds, VIEWER_SLOT_MAP, RACE_IDS } from '@gear-journey/wow-model-viewer'
+import type { Race, ItemEntry } from '@gear-journey/wow-model-viewer'
 import { computeEquippedAtLevel } from '@/app/lib/progression-utils'
-import { VIEWER_SLOT_MAP, RACE_IDS } from '@/app/lib/viewer-constants'
 import type { Item } from '@/app/lib/types'
 
-const ModelViewer = dynamic(
-  () => import('./model-viewer').then((m) => ({ default: m.ModelViewer })),
+const WowModelViewer = dynamic(
+  () => import('@gear-journey/wow-model-viewer').then((m) => ({ default: m.WowModelViewer })),
   { ssr: false }
 )
 
@@ -41,7 +41,7 @@ function equippedMapToPaperdoll(map: Record<string, Item[]>): Partial<Record<str
 
 export function CharacterTab({ items }: { items: Item[] }) {
   const [selectedLevel, setSelectedLevel] = useState(60)
-  const [race, setRace] = useState('human')
+  const [race, setRace] = useState<Race>('human')
   const [gender, setGender] = useState(0)
   const [debugAnimations, setDebugAnimations] = useState(false)
 
@@ -72,15 +72,15 @@ export function CharacterTab({ items }: { items: Item[] }) {
 
   const { getDisplayId, displayIds } = useDisplayIds(equippedItemIds)
 
-  const viewerItems = useMemo<[number, number][]>(() => {
-    const pairs: [number, number][] = []
+  const viewerItems = useMemo<ItemEntry[]>(() => {
+    const pairs: ItemEntry[] = []
     for (const [slot, slotItems] of Object.entries(equippedMap)) {
       const viewerSlot = VIEWER_SLOT_MAP[slot]
       if (viewerSlot === undefined) continue
       const item = slotItems[0]
       if (!item) continue
       const displayId = getDisplayId(item.itemId)
-      if (displayId) pairs.push([viewerSlot, displayId])
+      if (displayId) pairs.push([viewerSlot as ItemEntry[0], displayId])
     }
     return pairs
   }, [equippedMap, displayIds, getDisplayId])
@@ -90,7 +90,7 @@ export function CharacterTab({ items }: { items: Item[] }) {
       <div className="flex items-end gap-3">
         <Select
           value={race}
-          onChange={(e) => setRace(e.target.value)}
+          onChange={(e) => setRace(e.target.value as Race)}
           className="w-32"
         >
           {Object.keys(RACE_IDS).map((r) => (
@@ -125,9 +125,10 @@ export function CharacterTab({ items }: { items: Item[] }) {
       <PaperdollLayout
         equippedItems={equippedItems}
         modelSlot={
-          <ModelViewer
-            race={RACE_IDS[race]}
-            gender={gender}
+          <WowModelViewer
+            contentPath="/api/wowhead-proxy/modelviewer/classic/"
+            race={race}
+            gender={gender as 0 | 1}
             items={viewerItems}
             debug={debugAnimations}
           />
