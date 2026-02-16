@@ -1,16 +1,28 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { createElement } from 'react'
 import { db } from '@/app/lib/db'
 import { ItemsService } from '@/app/lib/items-service'
 import { decodeBisList, updateUrlHash, getUrlHash } from '@/app/lib/url-sharing'
 import type { Item } from '@/app/lib/types'
 
-export function useBisList() {
+interface BisListContextValue {
+  items: Item[]
+  isLoading: boolean
+  addItem: (item: Item) => Promise<void>
+  removeItem: (item: Item) => Promise<void>
+  clearAll: () => Promise<void>
+  hasItem: (itemId: number) => boolean
+}
+
+const BisListContext = createContext<BisListContextValue | null>(null)
+
+export function BisListProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<Item[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // Load from IndexedDB or URL on mount
+  // Load from IndexedDB or URL on mount (runs once)
   useEffect(() => {
     async function loadItems() {
       setIsLoading(true)
@@ -71,7 +83,6 @@ export function useBisList() {
   }, [items, isLoading])
 
   const addItem = useCallback(async (item: Item) => {
-    // Check if already exists
     const existing = await db.bisItems.where('itemId').equals(item.itemId).first()
     if (existing) return
 
@@ -101,12 +112,14 @@ export function useBisList() {
     [items]
   )
 
-  return {
-    items,
-    isLoading,
-    addItem,
-    removeItem,
-    clearAll,
-    hasItem,
-  }
+  return createElement(BisListContext.Provider, {
+    value: { items, isLoading, addItem, removeItem, clearAll, hasItem },
+    children,
+  })
+}
+
+export function useBisList() {
+  const ctx = useContext(BisListContext)
+  if (!ctx) throw new Error('useBisList must be used within BisListProvider')
+  return ctx
 }

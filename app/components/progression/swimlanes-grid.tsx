@@ -159,9 +159,9 @@ function ItemRow({
               GROUP_STARTS.has(slot) && 'border-l',
             )}
           >
-            {cellItems.map((item) => (
+            {cellItems.map((item, idx) => (
               <ItemCard
-                key={item.itemId}
+                key={`${item.itemId}-${idx}`}
                 item={item}
                 isEquipped={equippedIds.has(item.itemId)}
                 isDimmed={isDimmedRow}

@@ -118,3 +118,24 @@ Each entry follows Problem/Solution format:
 3. After model loads, restore all five values directly. Rotation (`azimuth`/`zenith`) can be set on the renderer directly. Zoom requires setting `zoom.target` and `zoom.current` on the renderer's zoom object — setting `renderer.distance` alone does NOT work because the zoom interpolation system overwrites it.
 
 **Insight:** ZamModelViewer's zoom is controlled by `renderer.zoom` — an interpolation system with `target`, `current`, `rateCurrent`, `interpolationRate`, and `range` properties. The `distance` property on the renderer is *derived* from the zoom object's state. Setting `distance` directly is immediately overwritten by the zoom interpolation. To persist zoom level, save and restore `zoom.target` and `zoom.current`. Rotation (`azimuth`/`zenith`) can be set directly on the renderer without issues. Passing camera values in the ZamModelViewer config object has no effect — those keys are ignored.
+
+---
+
+### 2026-02-16 - ZamModelViewer robes: Wowhead XML lies about inventorySlot, must probe CDN
+
+**Problem:** Robes didn't render on the 3D model. ZamModelViewer uses `meta/armor/{slot}/{displayId}.json` on the CDN, where slot 5 = Chest and slot 20 = Robe. But Wowhead's XML API returns `inventorySlot id="5"` for BOTH regular chest pieces and robes — it doesn't distinguish them. Passing slot 5 for a robe hits `meta/armor/5/{displayId}.json` → 404 → invisible item.
+
+**Attempted Solutions:**
+1. Static `VIEWER_SLOT_MAP` mapped `Chest → 5`. Robes need slot 20 but our item data normalizes all chest items to `slot: "Chest"`, losing the distinction.
+2. Used `slotId` from Wowhead XML as the viewer slot — but Wowhead returns `inventorySlot=5` for both chest pieces and robes, so this didn't help.
+3. Updated `NOT_DISPLAYED_SLOTS` filter from `[2, 11, 12, 13, 14]` to `[2, 11, 12]` — this fixed weapons (InventoryType 13 = One-Hand) and shields (14) being incorrectly hidden when using real InventoryType values, but robes still broken.
+
+**Final Solution:** Three-part fix:
+1. The `/api/wowhead-display-id/[itemId]` route now probes the CDN with HEAD requests to resolve the actual slot. For chest items (`inventorySlot=5`), it tries `meta/armor/5/{displayId}.json` first — if 404, tries `meta/armor/20/{displayId}.json` (robe). HEAD requests work on zamimg CDN. The resolved slot is cached server-side.
+2. The `useDisplayIds` hook now returns both `displayId` and `slotId` (as `DisplayInfo`), and `character-tab.tsx` uses `info.slotId` as the viewer slot instead of the static `VIEWER_SLOT_MAP` value.
+3. Added `?v=2` cache-buster to the client-side fetch URL to invalidate browser-cached API responses (which had `Cache-Control: max-age=86400` with the old slotId=5 values).
+
+**Insight:** Three key lessons:
+- **Wowhead XML `inventorySlot` is the equipment slot, NOT the InventoryType.** It returns 5 for all chest items regardless of whether they're chest pieces or robes. The CDN uses the InventoryType (5 vs 20) for path routing, so the XML slot can't be trusted for the viewer.
+- **When changing API response format, bust the browser cache.** A 24-hour `Cache-Control` means old responses persist even after server code changes. Version the fetch URL (`?v=2`) to force re-fetching.
+- **`NOT_DISPLAYED_SLOTS` must match the slot ID system in use.** When switching from static `VIEWER_SLOT_MAP` values (where weapons were 21/22) to real InventoryTypes (where One-Hand=13, Shield=14), the non-visual slot filter must be updated — 13 and 14 are visual items (weapons/shields), only 2/11/12 (Neck/Finger/Trinket) are truly non-visual.
