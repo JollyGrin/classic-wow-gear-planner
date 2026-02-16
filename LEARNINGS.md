@@ -60,3 +60,43 @@ Each entry follows Problem/Solution format:
 **Final Solution:** UNRESOLVED. The idle fidget may be baked into the Stand animation data itself, or the method calls may not be reaching the internal animation system. ZamModelViewer is a minified third-party library with limited documentation.
 
 **Insight:** ZamModelViewer API access path is `renderer.actors[0]` (not `renderer.models[0]`). Available methods: `setAnimation(name)`, `setAnimPaused(bool)`, `setAnimNoSubAnim(id)`. The viewer source also has `setTPose(bool)` which could force a static T-pose but would look unnatural. Further investigation needed — may require inspecting network traffic or the viewer's internal animation state machine.
+
+---
+
+### 2026-02-16 - ZamModelViewer animation control (minified internals)
+
+**Problem:** Needed to build a debug animation selector to isolate the idle tilt. The `wow-model-viewer` npm wrapper exposes `getListAnimations()` and `setAnimation()`, but the raw ZamModelViewer minifies all internal methods — `renderer.actors[0]` has no `getListAnimations` or `setAnimation` methods.
+
+**Attempted Solutions:**
+1. Tried calling `actor.getListAnimations()` / `actor.setAnimation(name)` — methods don't exist on minified actor (26 keys, zero callable methods).
+2. Checked `wow-model-viewer` wrapper source — it used `actor.h.P.Q.map(e => e.l)` for animation names, but minified property names have changed between versions.
+3. Searched all nested properties on the actor for arrays of objects with `.l` (name) fields.
+
+**Final Solution:** Animation names live at `actor.c.k.x[].l` in the current minified build (129 unique animations like Stand, Walk, Attack1H, etc.). Each sequence object has: `m` (anim ID), `a` (variation), `i` (duration ms), `d` (blend time), `b` (frequency), `j` (blend time 2), `c` (flags), `l` (name). To change animations, use `viewer.method('setAnimation', name)` — the top-level viewer dispatcher, NOT direct actor method calls. To pause: `viewer.method('setAnimPaused', bool)`.
+
+**Insight:** The minified ZamModelViewer changes property names between versions, so the `wow-model-viewer` npm wrapper's paths are stale. The viewer's `method()` dispatcher is the stable public API — it routes to internal actor methods by name. Always use `viewer.method(name, args)` rather than trying to call minified methods directly.
+
+---
+
+### 2026-02-16 - ZamModelViewer animation looping requires zeroing blend times
+
+**Problem:** Animations selected via the debug panel played once then snapped/stuttered instead of looping smoothly. Walk (1000ms duration) had a visible hitch at the loop point.
+
+**Attempted Solutions:**
+1. Set `WH.defaultAnimation = name` before calling `setAnimation` — animation did loop (viewer returns to default after one-shot), but with a visible transition gap.
+2. Set `renderer.crossFadeDuration = 0` — reduced but didn't eliminate the snap.
+3. Used `setInterval` to re-trigger `setAnimation` on a timer matching the animation duration — caused worse stuttering (timer drift fights the viewer's internal clock).
+
+**Final Solution:** Zero out blend/transition times on ALL animation sequences: `seq.d = 0` and `seq.j = 0` for every entry in `actor.c.k.x`, plus `renderer.crossFadeDuration = 0`. Combined with `WH.defaultAnimation = name`, the viewer loops seamlessly via its built-in default-animation mechanism. The sequence field `d` (default ~2080ms) was the primary culprit — it's the blend time between animation transitions, and was longer than most animation durations.
+
+**Insight:** ZamModelViewer's animation loop works by: play animation → finish → transition to `WH.defaultAnimation`. It's not a true loop; it's a repeated one-shot with crossfade. Three blend sources must all be zeroed: `renderer.crossFadeDuration`, `sequence.d`, and `sequence.j`. The blend times must be zeroed AFTER the model fully loads (sequences aren't available immediately when the viewer promise resolves) — poll `actor.c.k.x` until populated.
+
+---
+
+### 2026-02-16 - ZamModelViewer aspect ratio must match container
+
+**Problem:** The 3D model canvas had a large dead black space at the bottom of its container. The model rendered in the top portion with empty black below.
+
+**Final Solution:** Changed the viewer config `aspect` from `1` (square) to `3/4` to match the paperdoll container's `aspect-[3/4]` CSS. The viewer renders its canvas at whatever aspect ratio is specified in config — it must match the CSS container's aspect ratio.
+
+**Insight:** ZamModelViewer's `aspect` config controls the canvas rendering ratio, not just cropping. Mismatch with the CSS container creates dead space. Always keep `config.aspect` in sync with the container's CSS aspect ratio.
