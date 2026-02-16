@@ -1,9 +1,35 @@
+const CDN_BASE = 'https://wow.zamimg.com/modelviewer/classic/meta/armor'
+
+// Armor slots where the CDN uses a different path than inventorySlot.
+// Robes use slot 20 on the CDN but Wowhead XML reports inventorySlot=5.
+const SLOT_ALTERNATES: Record<number, number[]> = {
+  5: [5, 20], // Chest → try Chest first, then Robe
+}
+
 interface CacheEntry {
   displayId: number
   slotId: number
 }
 
 const cache = new Map<string, CacheEntry>()
+
+/** Check which CDN slot path actually has the armor model. */
+async function resolveArmorSlot(
+  displayId: number,
+  xmlSlotId: number
+): Promise<number> {
+  const candidates = SLOT_ALTERNATES[xmlSlotId]
+  if (!candidates) return xmlSlotId
+
+  for (const slot of candidates) {
+    const res = await fetch(`${CDN_BASE}/${slot}/${displayId}.json`, {
+      method: 'HEAD',
+    })
+    if (res.ok) return slot
+  }
+
+  return xmlSlotId
+}
 
 export async function GET(
   _request: Request,
@@ -34,7 +60,11 @@ export async function GET(
     const displayMatch = xml.match(/displayId="(\d+)"/)
     const slotMatch = xml.match(/inventorySlot id="(\d+)"/)
     const displayId = displayMatch ? Number(displayMatch[1]) : 0
-    const slotId = slotMatch ? Number(slotMatch[1]) : 0
+    const xmlSlotId = slotMatch ? Number(slotMatch[1]) : 0
+
+    // Resolve the actual CDN slot (e.g. Chest vs Robe)
+    const slotId =
+      displayId > 0 ? await resolveArmorSlot(displayId, xmlSlotId) : xmlSlotId
 
     const entry = { displayId, slotId }
     if (displayId > 0) {

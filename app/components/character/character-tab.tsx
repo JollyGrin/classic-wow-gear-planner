@@ -11,6 +11,9 @@ import { computeEquippedAtLevel } from '@/app/lib/progression-utils'
 import { VIEWER_SLOT_MAP, RACE_IDS } from '@/app/lib/viewer-constants'
 import type { Item } from '@/app/lib/types'
 
+// InventoryTypes that have no visual representation on the 3D model
+const NON_VISUAL_SLOTS = new Set([2, 11, 12])
+
 const ModelViewer = dynamic(
   () => import('./model-viewer').then((m) => ({ default: m.ModelViewer })),
   { ssr: false }
@@ -71,20 +74,25 @@ export function CharacterTab({ items }: { items: Item[] }) {
     return ids
   }, [equippedMap])
 
-  const { getDisplayId, displayIds } = useDisplayIds(equippedItemIds)
+  const { getDisplayInfo, displayInfos } = useDisplayIds(equippedItemIds)
 
   const viewerItems = useMemo<[number, number][]>(() => {
     const pairs: [number, number][] = []
     for (const [slot, slotItems] of Object.entries(equippedMap)) {
-      const viewerSlot = VIEWER_SLOT_MAP[slot]
-      if (viewerSlot === undefined) continue
+      // Quick check: skip slots that can't possibly map to a viewer slot
+      if (!(slot in VIEWER_SLOT_MAP)) continue
       const item = slotItems[0]
       if (!item) continue
-      const displayId = getDisplayId(item.itemId)
-      if (displayId) pairs.push([viewerSlot, displayId])
+      const info = getDisplayInfo(item.itemId)
+      if (!info || !info.displayId) continue
+      // Use the slotId from Wowhead (the real InventoryType) — this
+      // correctly distinguishes Chest (5) vs Robe (20), etc.
+      const viewerSlot = info.slotId || VIEWER_SLOT_MAP[slot]
+      if (NON_VISUAL_SLOTS.has(viewerSlot)) continue
+      pairs.push([viewerSlot, info.displayId])
     }
     return pairs
-  }, [equippedMap, displayIds, getDisplayId])
+  }, [equippedMap, displayInfos, getDisplayInfo])
 
   return (
     <div className="flex flex-col items-center gap-4">

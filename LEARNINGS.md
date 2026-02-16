@@ -118,3 +118,16 @@ Each entry follows Problem/Solution format:
 3. After model loads, restore all five values directly. Rotation (`azimuth`/`zenith`) can be set on the renderer directly. Zoom requires setting `zoom.target` and `zoom.current` on the renderer's zoom object — setting `renderer.distance` alone does NOT work because the zoom interpolation system overwrites it.
 
 **Insight:** ZamModelViewer's zoom is controlled by `renderer.zoom` — an interpolation system with `target`, `current`, `rateCurrent`, `interpolationRate`, and `range` properties. The `distance` property on the renderer is *derived* from the zoom object's state. Setting `distance` directly is immediately overwritten by the zoom interpolation. To persist zoom level, save and restore `zoom.target` and `zoom.current`. Rotation (`azimuth`/`zenith`) can be set directly on the renderer without issues. Passing camera values in the ZamModelViewer config object has no effect — those keys are ignored.
+
+---
+
+### 2026-02-16 - ZamModelViewer needs real InventoryType from Wowhead, not static slot mapping
+
+**Problem:** Robes and other items with InventoryType different from the "standard" slot type didn't render on the 3D model. A robe equipped in the Chest slot was invisible — the model showed a naked torso.
+
+**Attempted Solutions:**
+1. Static `VIEWER_SLOT_MAP` mapped `Chest → 5` (INVENTORY_TYPE_CHEST). But robes are InventoryType 20 (INVENTORY_TYPE_ROBE). The viewer uses the InventoryType for CDN routing (`meta/armor/5/` vs `meta/armor/20/`), so it loaded the wrong path and got nothing.
+
+**Final Solution:** The `/api/wowhead-display-id/[itemId]` endpoint already returns `slotId` (the real InventoryType from Wowhead XML). Changed `useDisplayIds` to return both `displayId` and `slotId`, and use `slotId` as the viewer slot instead of the static `VIEWER_SLOT_MAP` value. Fall back to `VIEWER_SLOT_MAP` only if `slotId` is missing.
+
+**Insight:** Our item data normalizes all chest-slot items to `slot: "Chest"`, losing the Chest vs Robe distinction. WoW has multiple InventoryTypes that map to the same equipment slot (Chest=5, Robe=20; One-Hand=13, Main Hand=21). ZamModelViewer needs the EXACT InventoryType for CDN path resolution. Always use the `slotId` from Wowhead's XML API as the viewer slot — it's the authoritative source for how the viewer should load the item.

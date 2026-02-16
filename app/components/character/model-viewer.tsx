@@ -15,8 +15,8 @@ declare global {
 
 const CONTENT_PATH = '/api/wowhead-proxy/modelviewer/classic/'
 
-// Slots that have no visual representation on the model
-const NOT_DISPLAYED_SLOTS = [2, 11, 12, 13, 14]
+// InventoryTypes with no visual representation on the model (Neck, Finger, Trinket)
+const NOT_DISPLAYED_SLOTS = [2, 11, 12]
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ViewerInstance = { destroy?: () => void; renderer?: { actors?: any[]; azimuth?: number; zenith?: number; distance?: number } }
