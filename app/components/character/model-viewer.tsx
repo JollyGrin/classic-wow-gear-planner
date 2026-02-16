@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -18,11 +18,15 @@ const CONTENT_PATH = '/api/wowhead-proxy/modelviewer/classic/'
 // Slots that have no visual representation on the model
 const NOT_DISPLAYED_SLOTS = [2, 11, 12, 13, 14]
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ViewerInstance = { destroy?: () => void; renderer?: { actors?: any[]; azimuth?: number; zenith?: number; distance?: number } }
+
 interface ModelViewerProps {
   race?: number
   gender?: number
   items?: [number, number][]
   className?: string
+  debug?: boolean
 }
 
 function loadScript(src: string): Promise<void> {
@@ -58,7 +62,7 @@ function setupWowheadGlobals() {
     const webp = { getImageExtension: () => '.webp' }
     window.WH = {
       debug: (...args: unknown[]) => console.log(args),
-      defaultAnimation: 'Stand',
+      defaultAnimation: 'Walk',
       WebP: webp,
       Wow: {
         Item: {
@@ -110,15 +114,123 @@ async function ensureGlobals() {
   await loadScript(`${CONTENT_PATH}viewer/viewer.min.js`)
 }
 
+function AnimationDebugPanel({ viewer }: { viewer: ViewerInstance }) {
+  const [animations, setAnimations] = useState<string[]>([])
+  const [currentAnim, setCurrentAnim] = useState('Stand')
+  const [paused, setPaused] = useState(false)
+  const blendsZeroed = useRef(false)
+
+  const getActor = useCallback(() => {
+    return viewer?.renderer?.actors?.[0]
+  }, [viewer])
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getSeqs = useCallback((): any[] | null => {
+    const seqs = getActor()?.c?.k?.x
+    return Array.isArray(seqs) ? seqs : null
+  }, [getActor])
+
+  useEffect(() => {
+    let attempts = 0
+    const interval = setInterval(() => {
+      attempts++
+      const seqs = getSeqs()
+      if (seqs && seqs.length > 0 && seqs[0]?.l) {
+        setAnimations([...new Set(seqs.map((e: { l: string }) => e.l))])
+        clearInterval(interval)
+      }
+      if (attempts > 40) clearInterval(interval)
+    }, 500)
+    return () => clearInterval(interval)
+  }, [getSeqs])
+
+  const handleAnimChange = (name: string) => {
+    setCurrentAnim(name)
+    setPaused(false)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const v = viewer as any
+    const renderer = v?.renderer
+
+    // Zero out all blend/transition times once so looping is seamless
+    if (!blendsZeroed.current) {
+      blendsZeroed.current = true
+      if (renderer) renderer.crossFadeDuration = 0
+      const seqs = getSeqs()
+      if (seqs) {
+        for (const seq of seqs) {
+          seq.d = 0  // blend time field 1
+          seq.j = 0  // blend time field 2
+        }
+      }
+    }
+
+    // Set as default animation so the viewer loops it naturally
+    if (window.WH) {
+      ;(window.WH as Record<string, unknown>).defaultAnimation = name
+    }
+    v?.method?.('setAnimation', name)
+  }
+
+  const togglePause = () => {
+    const next = !paused
+    setPaused(next)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const v = viewer as any
+    v?.method?.('setAnimPaused', next)
+  }
+
+  if (animations.length === 0) {
+    return (
+      <div className="absolute bottom-2 left-2 rounded bg-black/80 px-2 py-1 text-xs text-white">
+        Loading animations...
+      </div>
+    )
+  }
+
+  return (
+    <div className="absolute bottom-2 left-2 z-10 flex flex-col gap-1 rounded bg-black/80 p-2 text-xs text-white">
+      <div className="font-bold text-yellow-400">Animation Debug</div>
+      <select
+        value={currentAnim}
+        onChange={(e) => handleAnimChange(e.target.value)}
+        className="rounded bg-gray-800 px-1 py-0.5 text-xs text-white"
+      >
+        {animations.map((a) => (
+          <option key={a} value={a}>
+            {a}
+          </option>
+        ))}
+      </select>
+      <button
+        onClick={togglePause}
+        className="rounded bg-gray-700 px-1 py-0.5 hover:bg-gray-600"
+      >
+        {paused ? '▶ Play' : '⏸ Pause'}
+      </button>
+      <div className="text-gray-400">
+        {animations.length} animations available
+      </div>
+    </div>
+  )
+}
+
 export function ModelViewer({
   race = 1,
   gender = 0,
   items = [],
   className,
+  debug = false,
 }: ModelViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const viewerRef = useRef<{ destroy?: () => void } | null>(null)
+  const viewerRef = useRef<ViewerInstance | null>(null)
   const idRef = useRef(`model-viewer-${Math.random().toString(36).slice(2, 9)}`)
+  const cameraRef = useRef<{ azimuth: number; zenith: number; distance: number; zoomTarget: number; zoomCurrent: number } | null>(null)
+  const animationRef = useRef<string | null>(null)
+  const [viewerReady, setViewerReady] = useState(false)
+
+  // Stabilize items to avoid unnecessary recreations when the array
+  // reference changes but the actual [slot, displayId] pairs haven't
+  const itemsKey = JSON.stringify(items)
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -127,19 +239,22 @@ export function ModelViewer({
     container.id = idRef.current
 
     let cancelled = false
+    let cameraPollId: ReturnType<typeof setInterval> | null = null
+    setViewerReady(false)
 
     const initViewer = async () => {
       await ensureGlobals()
       if (cancelled) return
 
       const raceGenderId = race * 2 - 1 + gender
-      const filteredItems = items.filter(([slot]) => !NOT_DISPLAYED_SLOTS.includes(slot))
+      const parsedItems: [number, number][] = JSON.parse(itemsKey)
+      const filteredItems = parsedItems.filter(([slot]) => !NOT_DISPLAYED_SLOTS.includes(slot))
 
       const config: Record<string, unknown> = {
         type: 2,
         contentPath: CONTENT_PATH,
         container: window.jQuery(`#${idRef.current}`),
-        aspect: 1,
+        aspect: 3 / 4,
         dataEnv: 'classic',
         env: 'classic',
         gameDataEnv: 'classic',
@@ -155,6 +270,53 @@ export function ModelViewer({
         const viewer = await new window.ZamModelViewer(config)
         if (!cancelled) {
           viewerRef.current = viewer
+          setViewerReady(true)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const v = viewer as any
+
+          // Continuously poll camera state so cameraRef always has
+          // the latest values regardless of interaction type or timing
+          cameraPollId = setInterval(() => {
+            if (v.renderer) {
+              cameraRef.current = {
+                azimuth: v.renderer.azimuth,
+                zenith: v.renderer.zenith,
+                distance: v.renderer.distance,
+                zoomTarget: v.renderer.zoom?.target ?? 1,
+                zoomCurrent: v.renderer.zoom?.current ?? 1,
+              }
+            }
+          }, 250)
+
+          // Wait for model to fully load, then zero blend times and restore state
+          const waitForModel = setInterval(() => {
+            if (cancelled) { clearInterval(waitForModel); return }
+            const seqs = v.renderer?.actors?.[0]?.c?.k?.x
+            if (Array.isArray(seqs) && seqs.length > 0 && seqs[0]?.l) {
+              clearInterval(waitForModel)
+              if (v.renderer) v.renderer.crossFadeDuration = 0
+              for (const seq of seqs) { seq.d = 0; seq.j = 0 }
+
+              // Restore animation, falling back to Walk
+              const anim = animationRef.current || 'Walk'
+              if (window.WH) {
+                ;(window.WH as Record<string, unknown>).defaultAnimation = anim
+              }
+              v.method?.('setAnimation', anim)
+
+              // Restore camera orientation and zoom from previous instance
+              if (cameraRef.current && v.renderer) {
+                const saved = { ...cameraRef.current }
+                v.renderer.azimuth = saved.azimuth
+                v.renderer.zenith = saved.zenith
+                v.renderer.distance = saved.distance
+                if (v.renderer.zoom) {
+                  v.renderer.zoom.target = saved.zoomTarget
+                  v.renderer.zoom.current = saved.zoomCurrent
+                }
+              }
+            }
+          }, 200)
         }
       } catch (err) {
         console.error('Model viewer init error:', err)
@@ -165,17 +327,31 @@ export function ModelViewer({
 
     return () => {
       cancelled = true
+      if (cameraPollId) clearInterval(cameraPollId)
+      // cameraRef is kept up-to-date by polling,
+      // so no need to read from renderer here
+      // Save current animation
+      const defaultAnim = window.WH?.defaultAnimation
+      if (typeof defaultAnim === 'string') {
+        animationRef.current = defaultAnim
+      }
       viewerRef.current?.destroy?.()
       container.innerHTML = ''
       viewerRef.current = null
     }
-  }, [race, gender, items])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [race, gender, itemsKey])
 
   return (
-    <div
-      ref={containerRef}
-      className={className}
-      style={{ width: '100%', height: '100%' }}
-    />
+    <div className="relative overflow-hidden" style={{ width: '100%', height: '100%' }}>
+      <div
+        ref={containerRef}
+        className={className}
+        style={{ width: '100%', height: '100%' }}
+      />
+      {debug && viewerReady && viewerRef.current && (
+        <AnimationDebugPanel viewer={viewerRef.current} />
+      )}
+    </div>
   )
 }
