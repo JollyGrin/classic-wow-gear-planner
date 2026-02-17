@@ -77,7 +77,7 @@ var INVENTORY_TYPE = {
   QUIVER: 27,
   RELIC: 28
 };
-var NOT_DISPLAYED_SLOTS = [2, 11, 12, 13, 14];
+var NOT_DISPLAYED_SLOTS = [2, 11, 12];
 
 // src/globals.ts
 function loadScript(src) {
@@ -436,7 +436,7 @@ function getPending(baseUrl) {
   }
   return p;
 }
-async function fetchDisplayId(itemId, options) {
+async function fetchDisplayInfo(itemId, options) {
   var _a;
   const baseUrl = (_a = options == null ? void 0 : options.baseUrl) != null ? _a : "/api/wowhead-display-id";
   const c = getCache(baseUrl);
@@ -446,30 +446,33 @@ async function fetchDisplayId(itemId, options) {
   const inflight = p.get(itemId);
   if (inflight) return inflight;
   const promise = fetch(`${baseUrl}/${itemId}`).then((res) => res.json()).then((data) => {
-    const id = data.displayId || 0;
-    c.set(itemId, id);
+    const info = {
+      displayId: data.displayId || 0,
+      slotId: data.slotId || 0
+    };
+    c.set(itemId, info);
     p.delete(itemId);
-    return id;
+    return info;
   }).catch(() => {
     p.delete(itemId);
-    return 0;
+    return { displayId: 0, slotId: 0 };
   });
   p.set(itemId, promise);
   return promise;
 }
 async function fetchBatch(itemIds, options) {
   const results = await Promise.all(
-    itemIds.map(async (id) => [id, await fetchDisplayId(id, options)])
+    itemIds.map(async (id) => [id, await fetchDisplayInfo(id, options)])
   );
   return Object.fromEntries(results);
 }
 function useDisplayIds(itemIds, options) {
   var _a;
-  const [displayIds, setDisplayIds] = react.useState({});
+  const [displayInfos, setDisplayInfos] = react.useState({});
   const baseUrl = (_a = options == null ? void 0 : options.baseUrl) != null ? _a : "/api/wowhead-display-id";
-  const getDisplayId = react.useCallback(
-    (itemId) => displayIds[itemId] || null,
-    [displayIds]
+  const getDisplayInfo = react.useCallback(
+    (itemId) => displayInfos[itemId] || null,
+    [displayInfos]
   );
   react.useEffect(() => {
     if (itemIds.length === 0) return;
@@ -486,19 +489,19 @@ function useDisplayIds(itemIds, options) {
       }
     }
     if (Object.keys(known).length > 0) {
-      setDisplayIds((prev) => __spreadValues(__spreadValues({}, prev), known));
+      setDisplayInfos((prev) => __spreadValues(__spreadValues({}, prev), known));
     }
     if (toFetch.length === 0) return;
     fetchBatch(toFetch, options).then((results) => {
       if (!cancelled) {
-        setDisplayIds((prev) => __spreadValues(__spreadValues({}, prev), results));
+        setDisplayInfos((prev) => __spreadValues(__spreadValues({}, prev), results));
       }
     });
     return () => {
       cancelled = true;
     };
   }, [itemIds.join(","), baseUrl]);
-  return { getDisplayId, displayIds };
+  return { getDisplayInfo, displayInfos };
 }
 
 exports.AnimationDebugPanel = AnimationDebugPanel;
@@ -507,7 +510,7 @@ exports.NOT_DISPLAYED_SLOTS = NOT_DISPLAYED_SLOTS;
 exports.RACE_IDS = RACE_IDS;
 exports.VIEWER_SLOT_MAP = VIEWER_SLOT_MAP;
 exports.WowModelViewer = WowModelViewer;
-exports.fetchDisplayId = fetchDisplayId;
+exports.fetchDisplayInfo = fetchDisplayInfo;
 exports.useDisplayIds = useDisplayIds;
 //# sourceMappingURL=index.cjs.map
 //# sourceMappingURL=index.cjs.map

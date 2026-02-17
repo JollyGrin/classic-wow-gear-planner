@@ -13,6 +13,10 @@ interface CameraState {
     zoomTarget: number;
     zoomCurrent: number;
 }
+interface DisplayInfo {
+    displayId: number;
+    slotId: number;
+}
 interface DisplayIdFetchOptions {
     /** Base URL for the display ID API endpoint. Default: '/api/wowhead-display-id' */
     baseUrl?: string;
@@ -72,15 +76,15 @@ declare function AnimationDebugPanel({ viewer }: {
     viewer: ViewerInstance;
 }): react_jsx_runtime.JSX.Element;
 
-/** Fetch the Wowhead display ID for a single item. Caches results. */
-declare function fetchDisplayId(itemId: number, options?: DisplayIdFetchOptions): Promise<number>;
+/** Fetch the Wowhead display info for a single item. Caches results. */
+declare function fetchDisplayInfo(itemId: number, options?: DisplayIdFetchOptions): Promise<DisplayInfo>;
 /**
- * Hook that resolves Wowhead display IDs for a set of item IDs.
- * Returns a map of itemId -> displayId, updating as results arrive.
+ * Hook that resolves Wowhead display info for a set of item IDs.
+ * Returns a map of itemId -> DisplayInfo, updating as results arrive.
  */
 declare function useDisplayIds(itemIds: number[], options?: DisplayIdFetchOptions): {
-    getDisplayId: (itemId: number) => number | null;
-    displayIds: Record<number, number>;
+    getDisplayInfo: (itemId: number) => DisplayInfo | null;
+    displayInfos: Record<number, DisplayInfo>;
 };
 
 /** Normalized slot name -> ZamModelViewer inventory type ID.
@@ -124,4 +128,4 @@ declare const INVENTORY_TYPE: {
 /** Slots that have no visual representation on the 3D model */
 declare const NOT_DISPLAYED_SLOTS: number[];
 
-export { AnimationDebugPanel, type CameraState, type DisplayIdFetchOptions, type Gender, INVENTORY_TYPE, type ItemEntry, NOT_DISPLAYED_SLOTS, RACE_IDS, type Race, type SlotId, VIEWER_SLOT_MAP, type ViewerInstance, WowModelViewer, type WowModelViewerProps, fetchDisplayId, useDisplayIds };
+export { AnimationDebugPanel, type CameraState, type DisplayIdFetchOptions, type DisplayInfo, type Gender, INVENTORY_TYPE, type ItemEntry, NOT_DISPLAYED_SLOTS, RACE_IDS, type Race, type SlotId, VIEWER_SLOT_MAP, type ViewerInstance, WowModelViewer, type WowModelViewerProps, fetchDisplayInfo, useDisplayIds };

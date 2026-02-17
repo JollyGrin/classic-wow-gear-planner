@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
 import { Providers } from "./providers";
+import { Nav } from "./components/nav";
+import { BisListProvider } from "./hooks/use-bis-list";
+import { LevelProvider } from "./hooks/use-level";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,7 +25,18 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Providers>{children}</Providers>
+          <Providers>
+            <BisListProvider>
+              <LevelProvider>
+                <div className="min-h-screen bg-background">
+                  <Nav />
+                  <main className="container mx-auto px-4 py-6">
+                    {children}
+                  </main>
+                </div>
+              </LevelProvider>
+            </BisListProvider>
+          </Providers>
         </ThemeProvider>
       </body>
     </html>

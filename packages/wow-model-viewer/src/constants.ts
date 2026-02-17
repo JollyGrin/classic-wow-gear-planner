@@ -64,4 +64,4 @@ export const INVENTORY_TYPE = {
 } as const
 
 /** Slots that have no visual representation on the 3D model */
-export const NOT_DISPLAYED_SLOTS = [2, 11, 12, 13, 14]
+export const NOT_DISPLAYED_SLOTS = [2, 11, 12]

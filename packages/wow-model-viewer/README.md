@@ -112,7 +112,25 @@ WoW items have two IDs: the **item ID** (from game databases like mangos) and th
 Create `app/api/wowhead-display-id/[itemId]/route.ts`:
 
 ```ts
+const CDN_BASE = 'https://wow.zamimg.com/modelviewer/classic/meta/armor'
+
+// Robes use slot 20 on the CDN but Wowhead XML reports inventorySlot=5.
+const SLOT_ALTERNATES: Record<number, number[]> = {
+  5: [5, 20], // Chest → try Chest first, then Robe
+}
+
 const cache = new Map<string, { displayId: number; slotId: number }>()
+
+/** Check which CDN slot path actually has the armor model. */
+async function resolveArmorSlot(displayId: number, xmlSlotId: number): Promise<number> {
+  const candidates = SLOT_ALTERNATES[xmlSlotId]
+  if (!candidates) return xmlSlotId
+  for (const slot of candidates) {
+    const res = await fetch(`${CDN_BASE}/${slot}/${displayId}.json`, { method: 'HEAD' })
+    if (res.ok) return slot
+  }
+  return xmlSlotId
+}
 
 export async function GET(
   _request: Request,
@@ -141,7 +159,10 @@ export async function GET(
     const displayMatch = xml.match(/displayId="(\d+)"/)
     const slotMatch = xml.match(/inventorySlot id="(\d+)"/)
     const displayId = displayMatch ? Number(displayMatch[1]) : 0
-    const slotId = slotMatch ? Number(slotMatch[1]) : 0
+    const xmlSlotId = slotMatch ? Number(slotMatch[1]) : 0
+
+    // Resolve the actual CDN slot (e.g. Chest vs Robe)
+    const slotId = displayId > 0 ? await resolveArmorSlot(displayId, xmlSlotId) : xmlSlotId
 
     const entry = { displayId, slotId }
     if (displayId > 0) cache.set(itemId, entry)
@@ -159,14 +180,17 @@ export async function GET(
 
 ```tsx
 import { useDisplayIds } from '@gear-journey/wow-model-viewer'
+import type { DisplayInfo } from '@gear-journey/wow-model-viewer'
 
 function MyComponent({ itemIds }: { itemIds: number[] }) {
-  const { getDisplayId, displayIds } = useDisplayIds(itemIds)
+  const { getDisplayInfo, displayInfos } = useDisplayIds(itemIds)
 
   // With custom API base URL:
-  // const { getDisplayId } = useDisplayIds(itemIds, { baseUrl: '/my-api/display-ids' })
+  // const { getDisplayInfo } = useDisplayIds(itemIds, { baseUrl: '/my-api/display-ids' })
 
-  const displayId = getDisplayId(12345) // returns number | null
+  const info = getDisplayInfo(12345) // returns DisplayInfo | null
+  // info.displayId — Wowhead display ID for the 3D model
+  // info.slotId — resolved InventoryType (distinguishes Chest=5 vs Robe=20)
 }
 ```
 
@@ -209,6 +233,7 @@ import type {
   Gender,            // 0 | 1
   SlotId,            // 1 | 2 | 3 | ... | 26
   ItemEntry,         // [SlotId, number]
+  DisplayInfo,       // { displayId: number; slotId: number }
   WowModelViewerProps,
   CameraState,
   DisplayIdFetchOptions,

@@ -52,6 +52,11 @@ export interface CameraState {
   zoomCurrent: number
 }
 
+export interface DisplayInfo {
+  displayId: number
+  slotId: number
+}
+
 export interface DisplayIdFetchOptions {
   /** Base URL for the display ID API endpoint. Default: '/api/wowhead-display-id' */
   baseUrl?: string
