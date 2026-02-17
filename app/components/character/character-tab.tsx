@@ -5,17 +5,17 @@ import dynamic from 'next/dynamic'
 import { PaperdollLayout } from './paperdoll-layout'
 import { LevelScrubber } from '@/app/components/progression/level-scrubber'
 import { Select } from '@/app/components/ui/select'
-import { useDisplayIds } from '@/app/lib/display-ids'
+import { useDisplayIds, VIEWER_SLOT_MAP, RACE_IDS } from '@gear-journey/wow-model-viewer'
+import type { Race, ItemEntry } from '@gear-journey/wow-model-viewer'
 import { useLevel } from '@/app/hooks/use-level'
 import { computeEquippedAtLevel } from '@/app/lib/progression-utils'
-import { VIEWER_SLOT_MAP, RACE_IDS } from '@/app/lib/viewer-constants'
 import type { Item } from '@/app/lib/types'
 
 // InventoryTypes that have no visual representation on the 3D model
 const NON_VISUAL_SLOTS = new Set([2, 11, 12])
 
-const ModelViewer = dynamic(
-  () => import('./model-viewer').then((m) => ({ default: m.ModelViewer })),
+const WowModelViewer = dynamic(
+  () => import('@gear-journey/wow-model-viewer').then((m) => ({ default: m.WowModelViewer })),
   { ssr: false }
 )
 
@@ -45,7 +45,7 @@ function equippedMapToPaperdoll(map: Record<string, Item[]>): Partial<Record<str
 
 export function CharacterTab({ items }: { items: Item[] }) {
   const { selectedLevel, setSelectedLevel } = useLevel()
-  const [race, setRace] = useState('human')
+  const [race, setRace] = useState<Race>('human')
   const [gender, setGender] = useState(0)
   const [debugAnimations, setDebugAnimations] = useState(false)
 
@@ -76,8 +76,8 @@ export function CharacterTab({ items }: { items: Item[] }) {
 
   const { getDisplayInfo, displayInfos } = useDisplayIds(equippedItemIds)
 
-  const viewerItems = useMemo<[number, number][]>(() => {
-    const pairs: [number, number][] = []
+  const viewerItems = useMemo<ItemEntry[]>(() => {
+    const pairs: ItemEntry[] = []
     for (const [slot, slotItems] of Object.entries(equippedMap)) {
       // Quick check: skip slots that can't possibly map to a viewer slot
       if (!(slot in VIEWER_SLOT_MAP)) continue
@@ -89,7 +89,7 @@ export function CharacterTab({ items }: { items: Item[] }) {
       // correctly distinguishes Chest (5) vs Robe (20), etc.
       const viewerSlot = info.slotId || VIEWER_SLOT_MAP[slot]
       if (NON_VISUAL_SLOTS.has(viewerSlot)) continue
-      pairs.push([viewerSlot, info.displayId])
+      pairs.push([viewerSlot as ItemEntry[0], info.displayId])
     }
     return pairs
   }, [equippedMap, displayInfos, getDisplayInfo])
@@ -99,7 +99,7 @@ export function CharacterTab({ items }: { items: Item[] }) {
       <div className="flex items-end gap-3">
         <Select
           value={race}
-          onChange={(e) => setRace(e.target.value)}
+          onChange={(e) => setRace(e.target.value as Race)}
           className="w-32"
         >
           {Object.keys(RACE_IDS).map((r) => (
@@ -134,9 +134,10 @@ export function CharacterTab({ items }: { items: Item[] }) {
       <PaperdollLayout
         equippedItems={equippedItems}
         modelSlot={
-          <ModelViewer
-            race={RACE_IDS[race]}
-            gender={gender}
+          <WowModelViewer
+            contentPath="/api/wowhead-proxy/modelviewer/classic/"
+            race={race}
+            gender={gender as 0 | 1}
             items={viewerItems}
             debug={debugAnimations}
           />
