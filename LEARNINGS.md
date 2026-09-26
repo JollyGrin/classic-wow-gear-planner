@@ -118,3 +118,65 @@ Each entry follows Problem/Solution format:
 3. After model loads, restore all five values directly. Rotation (`azimuth`/`zenith`) can be set on the renderer directly. Zoom requires setting `zoom.target` and `zoom.current` on the renderer's zoom object — setting `renderer.distance` alone does NOT work because the zoom interpolation system overwrites it.
 
 **Insight:** ZamModelViewer's zoom is controlled by `renderer.zoom` — an interpolation system with `target`, `current`, `rateCurrent`, `interpolationRate`, and `range` properties. The `distance` property on the renderer is *derived* from the zoom object's state. Setting `distance` directly is immediately overwritten by the zoom interpolation. To persist zoom level, save and restore `zoom.target` and `zoom.current`. Rotation (`azimuth`/`zenith`) can be set directly on the renderer without issues. Passing camera values in the ZamModelViewer config object has no effect — those keys are ignored.
+
+---
+
+### 2026-02-16 - Mangos DBC display IDs ≠ Wowhead display IDs (~62% match)
+
+**Problem:** Tried to eliminate the Wowhead XML API dependency by using display IDs from the mangos `item_template.sql` (via thatsmybis/classic-wow-item-db). The plan assumed DBC display IDs would work with Wowhead's CDN.
+
+**Attempted Solutions:**
+1. Downloaded `item_template.sql` from thatsmybis (17,603 items with display IDs).
+2. Cross-referenced with `items.json` — got 69.6% coverage (7,626/10,951 items).
+3. Tested DBC display IDs against Wowhead's CDN for 10 items.
+
+**Result:** Only ~62% of DBC display IDs matched Wowhead's. Examples:
+| Item | Name | DBC displayId | Wowhead displayId | Match? |
+|------|------|--------------|-------------------|--------|
+| 647 | Destiny | 20190 | 20190 | YES |
+| 5341 | Spore-covered Tunic | 8717 | 7551 | NO |
+| 12640 | Lionheart Helm | 22920 | 22855 | NO |
+| 14551 | (Hands) | 28280 | 28280 | YES |
+| 11684 | (Chest) | 23618 | 21751 | NO |
+
+**Insight:** Wowhead's display ID system is distinct from the vanilla mangos DBC `ItemDisplayInfo` IDs. There is no predictable mapping or offset — some match exactly, some differ by hundreds. DBC data cannot be used as a drop-in replacement for Wowhead display IDs when rendering via ZamModelViewer. The only reliable source of Wowhead-compatible display IDs is Wowhead's own XML API.
+
+---
+
+### 2026-02-16 - Wowhead XML API rate limits at ~480 requests
+
+**Problem:** Built a scraper to pre-fetch Wowhead display IDs for all 10,951 items. At 5 concurrent requests / 200ms delay, Wowhead started returning non-XML responses (Cloudflare challenge pages) after ~480 successful fetches.
+
+**Attempted Solutions:**
+1. Initial run: CONCURRENCY=5, DELAY_MS=200 — rate limited after ~480 items (447 valid display IDs).
+2. Re-ran with CONCURRENCY=1, DELAY_MS=1500 — too slow (~4 hours estimated for full dataset).
+3. Used `CLEAR_ZEROS=1` to retry items that got 0 — this was a mistake: many items legitimately return displayId=0 (Trinkets, Rings, Necks have no 3D model). Clearing them corrupted the cache.
+
+**Insight:** Wowhead rate limits around ~500 requests in quick succession. A full scrape of 11k items requires very conservative pacing (~1 req/1.5s = ~4.5 hours) or multiple sessions. The `displayId=0` response is legitimate for non-visual equipment slots (Neck, Finger, Trinket, Shirt, Ammo) — don't assume 0 means "rate limited." Need a smarter approach: either scrape only visual-slot items (~8k Armor + Weapons), or accept partial static data with API fallback.
+
+---
+
+### 2026-02-16 - Turtle-WOW-DBC repo has no Item.dbc (itemId→displayId bridge missing)
+
+**Problem:** The plan assumed Turtle-WOW-DBC repo would provide the full `itemId → displayId` mapping chain. It has `ItemDisplayInfo.dbc` (23,852 records mapping displayId → model/texture) but NOT `Item.dbc`.
+
+**Insight:** In vanilla WoW 1.12.x, the `itemId → displayId` mapping lives server-side in `item_template` SQL, not in any client DBC file. The Turtle-WOW-DBC repo only contains client-side DBC exports. To get Turtle WoW custom item display IDs (items 40,000+), you'd need access to Turtle WoW's server database or a scrape of their database website (database.turtle-wow.org, which has no public API and is behind Cloudflare).
+
+---
+
+### 2026-02-16 - Current state of display ID static data pipeline
+
+**Status:** Partial implementation. What exists:
+- `scripts/build-display-ids.ts` — extracts DBC display IDs from `item_template.sql` (NOT Wowhead-compatible, ~62% match)
+- `scripts/scrape-wowhead-display-ids.ts` — scrapes Wowhead XML API with rate limiting, resumable cache
+- `data/external/wowhead-display-id-cache.json` — 463 valid Wowhead display IDs cached
+- `public/data/display-ids.json` — static lookup file (currently only 463 entries)
+- `app/lib/display-ids.ts` — refactored to load static JSON first, fall back to Wowhead API
+- `tests/unit/display-ids.test.ts` — 7 passing tests for the new resolution system
+
+**What's blocking full static coverage:**
+1. Wowhead rate limiting prevents quick bulk scrape (~4h for full dataset)
+2. Turtle WoW custom items (40,000+) don't exist on Wowhead at all
+3. DBC display IDs don't match Wowhead's, so can't use them as substitute
+
+**Pragmatic path forward:** The BiS list only has ~15-30 equipped items at a time. The runtime API fallback works fine for this scale. The static file is a performance optimization, not a requirement. Run the scraper in background sessions to incrementally build coverage.
