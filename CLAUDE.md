@@ -75,3 +75,12 @@ jq '[.[] | select(.name | test("shadowfang"; "i"))] | .[0:3]' public/data/items.
 # Count items by slot
 jq 'group_by(.slot) | map({slot: .[0].slot, count: length})' public/data/items.json
 ```
+
+## Context & memory
+
+- When compacting, always preserve the list of modified files, the task's
+  acceptance criteria, the build/test command, the PR URL, and the
+  `STATUS:` line contract.
+- Auto memory (`~/.claude/projects/<repo>/memory/`) holds Claude-written
+  notes — corrections and confirmed approaches, one lesson per file. Don't
+  save what the repo, its docs, or git history already record.
